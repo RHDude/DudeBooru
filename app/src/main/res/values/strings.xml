@@ -532,7 +532,8 @@
     <string name="about_whats_new">What is new in %1$s</string>
     <string name="whats_new">• Swipe back like in Telegram: drag a screen right from anywhere, the previous one shows underneath
 • Works in settings, search, profile, collections, artist pages and other screens; the viewer keeps its own swipe down
-• Telegram-style profile: centered avatar that stretches to full width when you pull down</string>
+• Telegram-style profile: centered avatar that stretches to full width when you pull down
+• Turning on video sound pauses music playing in another app</string>
     <!-- Settings: sources, viewer, privacy, data, about -->
     <string name="settings_profile_edit">Edit profile</string>
     <string name="settings_value_relogin">Sign in again</string>

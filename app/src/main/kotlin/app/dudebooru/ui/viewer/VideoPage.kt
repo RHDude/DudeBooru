@@ -45,6 +45,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -61,6 +63,9 @@ import app.dudebooru.ui.icons.DudeIcons
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.roundToLong
+
+/** Видео со звуком — обычное медиа: так система и другие плееры понимают, что пора замолчать. */
+private val VideoAudio = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build()
 
 /** Высота нижней панели просмотра без системной полосы: кнопки 40dp и отступы 10dp. */
 private val ViewerBottomBar = 60.dp
@@ -101,6 +106,11 @@ fun VideoPage(post: Post, active: Boolean, barsVisible: Boolean, onTap: () -> Un
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
             }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                // Звук забрало другое приложение (снова включили музыку, звонок) — видео на паузе, кнопка это показывает.
+                if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) paused = true
+            }
         }
         player.addListener(listener)
         onDispose {
@@ -109,7 +119,12 @@ fun VideoPage(post: Post, active: Boolean, barsVisible: Boolean, onTap: () -> Un
         }
     }
     LaunchedEffect(active, paused) { player.playWhenReady = active && !paused }
-    LaunchedEffect(muted) { player.volume = if (muted) 0f else 1f }
+    LaunchedEffect(muted) {
+        player.volume = if (muted) 0f else 1f
+        // Со звуком видео берёт аудиофокус: музыка в другом приложении встаёт на паузу.
+        // Без звука фокус не нужен — музыка играет дальше, как в Telegram.
+        player.setAudioAttributes(VideoAudio, !muted)
+    }
     // Позиция опрашивается, пока видео на экране: у ExoPlayer нет события «время изменилось».
     LaunchedEffect(player, active) {
         while (active && isActive) {
