@@ -98,6 +98,17 @@ fun IconPickerScreen(onBack: () -> Unit) {
                 IconPreview(selected, Modifier.size(112.dp))
                 Spacer(Modifier.height(10.dp))
                 Text(stringResource(selected.label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                // Маскировка: у этой иконки и имя другое — на рабочем столе и в системе приложение станет «Галереей».
+                if (selected == AppIcon.NEUTRAL) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.icon_neutral_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                }
             }
         }
         LazyVerticalGrid(

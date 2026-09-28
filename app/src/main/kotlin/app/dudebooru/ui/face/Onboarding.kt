@@ -347,6 +347,15 @@ private fun LookPage(look: OnboardingChoice.Look, icon: AppIcon, onLook: (Onboar
         }
         Spacer(Modifier.height(6.dp))
     }
+    if (icon == AppIcon.NEUTRAL) {
+        Text(
+            stringResource(R.string.icon_neutral_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
     Spacer(Modifier.height(16.dp))
     Text(stringResource(R.string.onb_accounts_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
 }

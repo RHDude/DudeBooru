@@ -611,4 +611,5 @@
     <string name="quick_saved">Saved</string>
     <string name="quick_share">Share</string>
     <string name="quick_similar">Similar</string>
+    <string name="icon_neutral_hint">Disguise: on the home screen and in the system the app will be called “Gallery” — even in the uninstall dialog</string>
 </resources>
