@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import app.dudebooru.ui.common.label
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -123,7 +124,19 @@ fun ArtistScreen(vm: MainViewModel, controller: FeedController, name: String, ac
             }
         }
         // На странице художника сетка по умолчанию.
-        FeedList(controller, actions, modifier = Modifier.padding(padding), grid = true) {
+        val mode by vm.mode.collectAsStateWithLifecycle()
+        FeedList(
+            controller,
+            actions,
+            modifier = Modifier.padding(padding),
+            grid = true,
+            emptyContent = {
+                app.dudebooru.ui.face.EmptyState(
+                    app.dudebooru.ui.face.rememberKaomoji(listOf("(・_・;)") + app.dudebooru.ui.face.Kaomoji.CONFUSED),
+                    stringResource(R.string.artist_empty_mode, stringResource(mode.label())),
+                )
+            },
+        ) {
             run {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

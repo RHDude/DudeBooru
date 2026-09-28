@@ -22,6 +22,10 @@ import app.dudebooru.data.settings.CensorPrefs
 import app.dudebooru.data.settings.FeedPrefs
 import app.dudebooru.data.settings.Profile
 import app.dudebooru.data.settings.ThemeMode
+import app.dudebooru.ui.theme.AppTheme
+import app.dudebooru.ui.theme.NightSchedule
+import app.dudebooru.ui.theme.ThemePresets
+import app.dudebooru.ui.theme.ThemeFiles
 import app.dudebooru.ui.feed.CustomChunk
 import app.dudebooru.ui.feed.FeedController
 import app.dudebooru.ui.feed.FeedItem
@@ -35,10 +39,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/** Настройка прямо сейчас: DataStore читает файл один раз, дальше из памяти. */
+private fun <T> Flow<T>.now(): T = kotlinx.coroutines.runBlocking { first() }
+
 class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(app) {
 
     val mode: StateFlow<ContentMode> = c.settings.contentMode.stateIn(viewModelScope, SharingStarted.Eagerly, ContentMode.SFW)
-    val themeMode: StateFlow<ThemeMode> = c.settings.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
+    // Тема и первый запуск читаются сразу: первый кадр без мигания светлым.
+    val themeMode: StateFlow<ThemeMode> = c.settings.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, c.settings.themeMode.now())
     val profile: StateFlow<Profile?> = c.settings.profile.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val censor: StateFlow<Boolean> = c.settings.censorEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val censorPrefs: StateFlow<CensorPrefs> = c.settings.censorPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, CensorPrefs())
@@ -289,8 +297,166 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
         viewModelScope.launch { c.settings.setCensorEnabled(enable) }
     }
 
+    private fun resolveTheme(id: String, custom: AppTheme?) =
+        if (id == "custom") custom ?: ThemePresets.MONET else ThemePresets.byId(id) ?: ThemePresets.MONET
+
+    val appTheme: StateFlow<AppTheme> = combine(c.settings.themeId, c.settings.customTheme, ::resolveTheme)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, resolveTheme(c.settings.themeId.now(), c.settings.customTheme.now()))
+
+    val nightSchedule: StateFlow<Pair<Int, Int>> = c.settings.nightSchedule.stateIn(viewModelScope, SharingStarted.Eagerly, c.settings.nightSchedule.now())
+    val nightOverride: StateFlow<Pair<Boolean, Long>?> = c.settings.nightOverride.stateIn(viewModelScope, SharingStarted.Eagerly, c.settings.nightOverride.now())
+
+    /** Мгновенный результат кнопки — пока DataStore не записал, чтобы круговая смена шла без задержки. */
+    private val _instantDark = MutableStateFlow<Boolean?>(null)
+    val instantDark: StateFlow<Boolean?> = _instantDark.asStateFlow()
+
+    /** Тёмная ли тема по режиму: система, вручную, расписание или закат (с ручным переключением до следующей смены). */
+    fun effectiveDark(systemDark: Boolean, now: java.time.ZonedDateTime): Boolean {
+        _instantDark.value?.let { return it }
+        val override = nightOverride.value
+        return when (themeMode.value) {
+            ThemeMode.SYSTEM -> systemDark
+            ThemeMode.LIGHT -> false
+            ThemeMode.DARK -> true
+            ThemeMode.SCHEDULE, ThemeMode.SUNSET -> {
+                if (override != null && now.toInstant().toEpochMilli() < override.second) return override.first
+                val (start, end) = scheduleFor(now)
+                NightSchedule.scheduleDark(now.toLocalTime(), start, end)
+            }
+        }
+    }
+
+    private fun scheduleFor(now: java.time.ZonedDateTime): Pair<Int, Int> =
+        if (themeMode.value == ThemeMode.SUNSET) {
+            val (sunrise, sunset) = NightSchedule.sunTimes(now.toLocalDate(), now.zone)
+            sunset to sunrise
+        } else {
+            nightSchedule.value
+        }
+
     fun toggleTheme(currentlyDark: Boolean) {
-        viewModelScope.launch { c.settings.setThemeMode(if (currentlyDark) ThemeMode.LIGHT else ThemeMode.DARK) }
+        val target = !currentlyDark
+        _instantDark.value = target
+        viewModelScope.launch {
+            when (themeMode.value) {
+                ThemeMode.SCHEDULE, ThemeMode.SUNSET -> {
+                    val now = java.time.ZonedDateTime.now()
+                    val (start, end) = scheduleFor(now)
+                    c.settings.setNightOverride(target, NightSchedule.nextScheduleSwitch(now, start, end))
+                }
+                else -> c.settings.setThemeMode(if (target) ThemeMode.DARK else ThemeMode.LIGHT)
+            }
+            kotlinx.coroutines.delay(600)
+            _instantDark.value = null
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            c.settings.setNightOverride(null, 0)
+            c.settings.setThemeMode(mode)
+        }
+    }
+
+    fun setNightSchedule(start: Int, end: Int) {
+        viewModelScope.launch { c.settings.setNightSchedule(start, end) }
+    }
+
+    val customTheme: StateFlow<AppTheme?> = c.settings.customTheme.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Черновик для редактора (фон из поста): редактор забирает его при открытии. */
+    val editorDraft = MutableStateFlow<AppTheme?>(null)
+
+    /** Последний известный вариант темы — редактор открывается на нём. */
+    var lastDark = false
+
+    /** Тема из файла или кода ждёт «Применить». */
+    val pendingTheme = MutableStateFlow<AppTheme?>(null)
+
+    fun offerTheme(theme: AppTheme) {
+        pendingTheme.value = theme
+    }
+
+    fun importThemeFile(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            val theme = ThemeFiles.readImport(context, uri)
+            if (theme == null) {
+                android.widget.Toast.makeText(context, context.getString(app.dudebooru.R.string.themes_bad_file), android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                pendingTheme.value = theme
+            }
+        }
+    }
+
+    fun applyPendingTheme() {
+        val theme = pendingTheme.value ?: return
+        pendingTheme.value = null
+        saveCustomTheme(theme)
+    }
+
+    /** Картинка поста — фоном своей темы; открывается редактор с черновиком. */
+    suspend fun setThemeBackgroundFrom(context: android.content.Context, url: String): Boolean {
+        val path = ThemeFiles.imageFromUrl(context, url) ?: return false
+        val base = appTheme.value.let { if (it.id == "custom") it else it.copy(id = "custom", name = context.getString(app.dudebooru.R.string.theme_custom)) }
+        editorDraft.value = base.copy(
+            background = base.background.copy(kind = app.dudebooru.ui.theme.ThemeBackground.Kind.IMAGE, imagePath = path),
+        )
+        return true
+    }
+
+    val gameRecord: StateFlow<Int> = c.settings.gameRecord.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    fun saveGameRecord(score: Int) {
+        viewModelScope.launch { c.settings.setGameRecord(score) }
+    }
+
+    /** null — ещё не прочитали: не мигаем экраном первого запуска у тех, кто его прошёл. */
+    val onboarded: StateFlow<Boolean?> = c.settings.onboarded.map<Boolean, Boolean?> { it }.stateIn(viewModelScope, SharingStarted.Eagerly, c.settings.onboarded.now())
+
+    fun finishOnboarding() {
+        viewModelScope.launch { c.settings.setOnboarded() }
+    }
+
+    /** Выбор с экранов первого запуска — в настройки. */
+    fun applyOnboarding(context: android.content.Context, choice: app.dudebooru.ui.face.OnboardingChoice) {
+        if (choice.icon != app.dudebooru.ui.face.IconManager.current(context)) app.dudebooru.ui.face.IconManager.apply(context, choice.icon)
+        viewModelScope.launch {
+            if (choice.mode != ContentMode.SFW) c.settings.setAdultConfirmed()
+            c.settings.setContentMode(choice.mode)
+            c.settings.setCensorEnabled(choice.censor)
+            c.settings.setFolderOrder(choice.order)
+            app.dudebooru.booru.site.Sites.builtIn.forEach { c.settings.setFolderHidden(it.id, it.id in choice.hidden) }
+            when (choice.look) {
+                app.dudebooru.ui.face.OnboardingChoice.Look.MONET -> {
+                    c.settings.setThemeId(ThemePresets.MONET.id)
+                    c.settings.setThemeMode(ThemeMode.SYSTEM)
+                }
+                app.dudebooru.ui.face.OnboardingChoice.Look.LIGHT -> {
+                    c.settings.setThemeId(ThemePresets.CLASSIC.id)
+                    c.settings.setThemeMode(ThemeMode.LIGHT)
+                }
+                app.dudebooru.ui.face.OnboardingChoice.Look.DARK -> {
+                    c.settings.setThemeId(ThemePresets.CLASSIC.id)
+                    c.settings.setThemeMode(ThemeMode.DARK)
+                }
+            }
+            c.settings.setOnboarded()
+        }
+    }
+
+    fun selectTheme(id: String) {
+        viewModelScope.launch { c.settings.setThemeId(id) }
+    }
+
+    fun saveCustomTheme(theme: AppTheme) {
+        viewModelScope.launch {
+            c.settings.setCustomTheme(theme.copy(id = "custom"))
+            c.settings.setThemeId("custom")
+            // Старые картинки фона больше не нужны.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                ThemeFiles.cleanup(getApplication(), theme.background.imagePath)
+            }
+        }
     }
 
     // --- лайки и сохранённые (синхронизация с сайтом — шаг «коллекции») -----------------------

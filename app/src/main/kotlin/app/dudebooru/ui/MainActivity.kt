@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 
 package app.dudebooru.ui
 
@@ -29,6 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -64,32 +66,88 @@ import app.dudebooru.ui.main.SoonScreen
 import app.dudebooru.ui.search.SearchScreen
 import app.dudebooru.ui.search.SearchViewModel
 import app.dudebooru.ui.theme.DudeTheme
+import app.dudebooru.ui.theme.ThemeImportDialog
+import app.dudebooru.ui.theme.ThemeReveal
+import app.dudebooru.ui.theme.ThemeRevealHost
+import app.dudebooru.ui.face.OnboardingScreen
 import app.dudebooru.ui.theme.LocalTagColors
 import app.dudebooru.ui.viewer.ViewerScreen
 import kotlin.system.exitProcess
+
+/** Файл темы из чужого приложения ждёт, пока соберётся интерфейс. */
+private val incomingTheme = kotlinx.coroutines.flow.MutableStateFlow<android.net.Uri?>(null)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val app = application as DudeApp
+        if (savedInstanceState == null) takeThemeIntent(intent)
         setContent {
             val vm = viewModel { MainViewModel(app, app.container) }
             val themeMode by vm.themeMode.collectAsStateWithLifecycle()
-            val dark = when (themeMode) {
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
-                ThemeMode.LIGHT -> false
-                ThemeMode.DARK -> true
+            val theme by vm.appTheme.collectAsStateWithLifecycle()
+            val instant by vm.instantDark.collectAsStateWithLifecycle()
+            val override by vm.nightOverride.collectAsStateWithLifecycle()
+            val schedule by vm.nightSchedule.collectAsStateWithLifecycle()
+            val systemDark = isSystemInDarkTheme()
+            // Расписание и закат: пересчёт раз в минуту.
+            val minute by produceState(System.currentTimeMillis() / 60_000) {
+                while (true) {
+                    kotlinx.coroutines.delay(60_000)
+                    value = System.currentTimeMillis() / 60_000
+                }
             }
+            val dark = remember(themeMode, instant, override, schedule, systemDark, minute) {
+                vm.effectiveDark(systemDark, java.time.ZonedDateTime.now())
+            }
+            val reveal = remember { ThemeReveal() }
             LaunchedEffect(dark) {
                 val transparent = AndroidColor.TRANSPARENT
                 val style = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
-            DudeTheme(dark = dark) {
-                DudeRoot(vm, dark, onCloseApp = ::closeApp)
+            ThemeRevealHost(reveal) {
+                DudeTheme(theme = theme, dark = dark) {
+                    vm.lastDark = dark
+                    val incoming by incomingTheme.collectAsStateWithLifecycle()
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    LaunchedEffect(incoming) {
+                        incoming?.let {
+                            vm.importThemeFile(context, it)
+                            incomingTheme.value = null
+                        }
+                    }
+                    val onboarded by vm.onboarded.collectAsStateWithLifecycle()
+                    when (onboarded) {
+                        null -> Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
+                        false -> {
+                            val folders by vm.c.settings.folders.collectAsStateWithLifecycle(null)
+                            folders?.let { f ->
+                                OnboardingScreen(f.order, f.hidden) { choice -> vm.applyOnboarding(context, choice) }
+                            }
+                        }
+                        true -> DudeRoot(vm, dark, onCloseApp = ::closeApp)
+                    }
+                    val pending by vm.pendingTheme.collectAsStateWithLifecycle()
+                    pending?.let { t ->
+                        ThemeImportDialog(t, onApply = vm::applyPendingTheme, onDismiss = { vm.pendingTheme.value = null })
+                    }
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        takeThemeIntent(intent)
+    }
+
+    /** Файл темы, открытый из Telegram или файлового менеджера, сразу предлагает применить тему. */
+    private fun takeThemeIntent(intent: android.content.Intent?) {
+        if (intent?.action != android.content.Intent.ACTION_VIEW && intent?.action != android.content.Intent.ACTION_SEND) return
+        val uri = intent.data ?: androidx.core.content.IntentCompat.getParcelableExtra(intent, android.content.Intent.EXTRA_STREAM, android.net.Uri::class.java) ?: return
+        incomingTheme.value = uri
     }
 
     /** «Закрыть приложение» полностью выгружает его; блокировка (когда появится) спросит PIN заново. */
@@ -133,68 +191,107 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
         LocalFeedPrefs provides feedPrefs.copy(showHiddenCount = showHidden),
         LocalCensor provides CensorState(censorOn, mode, censorPrefs, revealed),
         LocalDownloaded provides downloaded,
+        app.dudebooru.ui.feed.LocalFeedEnv provides actions,
     ) {
         Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
             BackHandler { if (!vm.back()) activity?.finish() }
-            when (val route = vm.stack.last()) {
-                Route.Main -> MainShell(vm, actions, dark, onCloseApp)
-                is Route.Search -> {
-                    val site = vm.c.registry.site(route.siteId) ?: return@Surface
-                    val searchVm = viewModel(key = "search:${route.siteId}") { SearchViewModel(vm.c, site) }
-                    SearchScreen(
-                        vm = searchVm,
-                        initial = route.initial,
-                        onBack = { vm.back() },
-                        onSearch = { tags ->
-                            vm.back()
-                            vm.openSearchResults(route.siteId, tags)
-                        },
-                    )
-                }
-                is Route.Results -> {
-                    val controller = vm.controller(route.controllerId) ?: return@Surface
-                    ResultsScreen(
-                        controller = controller,
-                        actions = actions,
-                        onBack = { vm.back() },
-                        onEditQuery = { vm.navigate(Route.Search(controller.site.id, controller.tags.joinToString(" "))) },
-                    )
-                }
-                is Route.Viewer -> {
-                    val controller = vm.controller(route.controllerId) ?: return@Surface
-                    ViewerScreen(
-                        controller = controller,
-                        startKey = route.startKey,
-                        actions = actions,
-                        onClose = { vm.back() },
-                        onSearchTag = { post, tag, add ->
-                            if (add) {
-                                vm.navigate(Route.Search(post.site, (controller.tags + tag).distinct().joinToString(" ")))
-                            } else {
-                                vm.openSearchResults(post.site, listOf(tag))
-                            }
-                        },
-                    )
-                }
-                is Route.Artist -> {
-                    val controller = vm.controller(route.controllerId) ?: return@Surface
-                    ArtistScreen(vm, controller, route.name, actions, onBack = { vm.back() })
-                }
-                Route.Settings -> {
-                    val accountsVm = viewModel { AccountsViewModel(context.applicationContext as android.app.Application, vm.c) }
-                    AccountsScreen(accountsVm, onBack = { vm.back() }, onOpenNegativeTags = { vm.navigate(Route.NegativeTags) })
-                }
-                Route.NegativeTags -> NegativeTagsScreen(vm, onBack = { vm.back() })
-                is Route.Soon -> SoonScreen(route.title, route.step, onBack = { vm.back() })
-                Route.Saved -> SavedScreen(vm, actions, onBack = { vm.back() })
-                Route.Profile -> ProfileScreen(vm, actions, onBack = { vm.back() }, onEdit = { vm.navigate(Route.Settings) })
-                Route.History -> HistoryScreen(vm, actions, onBack = { vm.back() })
-                Route.Artists -> ArtistsScreen(vm, onBack = { vm.back() })
-                Route.Downloads -> DownloadsScreen(vm, onBack = { vm.back() })
-                Route.Recs -> app.dudebooru.ui.rec.RecsScreen(vm, actions, onBack = { vm.back() })
-                is Route.Similar -> {
-                    val controller = vm.controller(route.controllerId) ?: return@Surface
-                    app.dudebooru.ui.rec.SimilarScreen(vm, controller, route.post, actions, onBack = { vm.back() })
+            // Переходы между экранами; из ленты в пост картинка перелетает (общий элемент).
+            val reduced = app.dudebooru.ui.face.rememberReducedMotion()
+            androidx.compose.animation.SharedTransitionLayout {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = vm.stack.last(),
+                    transitionSpec = {
+                        if (reduced) {
+                            androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+                        } else {
+                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) togetherWith
+                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(180))
+                        }
+                    },
+                    label = "routes",
+                ) { route ->
+                    CompositionLocalProvider(
+                        app.dudebooru.ui.common.LocalSharedScope provides if (reduced) null else this@SharedTransitionLayout,
+                        app.dudebooru.ui.common.LocalRouteScope provides this@AnimatedContent,
+                    ) {
+                        when (route) {
+                        Route.Main -> MainShell(vm, actions, dark, onCloseApp)
+                        is Route.Search -> {
+                            val site = vm.c.registry.site(route.siteId) ?: return@CompositionLocalProvider
+                            val searchVm = viewModel(key = "search:${route.siteId}") { SearchViewModel(vm.c, site) }
+                            SearchScreen(
+                                vm = searchVm,
+                                initial = route.initial,
+                                onBack = { vm.back() },
+                                onSearch = { tags ->
+                                    vm.back()
+                                    vm.openSearchResults(route.siteId, tags)
+                                },
+                            )
+                        }
+                        is Route.Results -> {
+                            val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
+                            ResultsScreen(
+                                controller = controller,
+                                actions = actions,
+                                onBack = { vm.back() },
+                                onEditQuery = { vm.navigate(Route.Search(controller.site.id, controller.tags.joinToString(" "))) },
+                            )
+                        }
+                        is Route.Viewer -> {
+                            val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
+                            ViewerScreen(
+                                controller = controller,
+                                startKey = route.startKey,
+                                actions = actions,
+                                onClose = { vm.back() },
+                                onSearchTag = { post, tag, add ->
+                                    if (add) {
+                                        vm.navigate(Route.Search(post.site, (controller.tags + tag).distinct().joinToString(" ")))
+                                    } else {
+                                        vm.openSearchResults(post.site, listOf(tag))
+                                    }
+                                },
+                            )
+                        }
+                        is Route.Artist -> {
+                            val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
+                            ArtistScreen(vm, controller, route.name, actions, onBack = { vm.back() })
+                        }
+                        Route.Settings -> {
+                            val accountsVm = viewModel { AccountsViewModel(context.applicationContext as android.app.Application, vm.c) }
+                            AccountsScreen(
+                                accountsVm,
+                                onBack = { vm.back() },
+                                onOpenNegativeTags = { vm.navigate(Route.NegativeTags) },
+                                onOpenThemes = { vm.navigate(Route.Themes) },
+                                onOpenIcons = { vm.navigate(Route.IconPicker) },
+                                onOpenGame = { vm.navigate(Route.Game) },
+                            )
+                        }
+                        Route.NegativeTags -> NegativeTagsScreen(vm, onBack = { vm.back() })
+                        is Route.Soon -> SoonScreen(route.title, route.step, onBack = { vm.back() })
+                        Route.Saved -> SavedScreen(vm, actions, onBack = { vm.back() })
+                        Route.Profile -> ProfileScreen(vm, actions, onBack = { vm.back() }, onEdit = { vm.navigate(Route.Settings) })
+                        Route.History -> HistoryScreen(vm, actions, onBack = { vm.back() })
+                        Route.Artists -> ArtistsScreen(vm, onBack = { vm.back() })
+                        Route.Downloads -> DownloadsScreen(vm, onBack = { vm.back() })
+                        Route.Recs -> app.dudebooru.ui.rec.RecsScreen(vm, actions, onBack = { vm.back() })
+                        Route.IconPicker -> app.dudebooru.ui.face.IconPickerScreen(onBack = { vm.back() })
+                        Route.Themes -> app.dudebooru.ui.theme.ThemesScreen(
+                            vm,
+                            onBack = { vm.back() },
+                            onEditor = { vm.navigate(Route.ThemeEditor) },
+                            onIconPicker = { vm.navigate(Route.IconPicker) },
+                        )
+                        Route.ThemeEditor -> app.dudebooru.ui.theme.ThemeEditorScreen(vm, onBack = { vm.back() })
+                        Route.Game -> app.dudebooru.ui.face.GameScreen(vm, onBack = { vm.back() })
+                        is Route.Similar -> {
+                            val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
+                            app.dudebooru.ui.rec.SimilarScreen(vm, controller, route.post, actions, onBack = { vm.back() })
+                        }
+                        }
+                    }
                 }
             }
             NotInterestedSheet(actions)

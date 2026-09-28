@@ -2,6 +2,8 @@
 
 package app.dudebooru.ui.feed
 
+import app.dudebooru.ui.common.sharedPost
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -89,6 +91,8 @@ fun FeedList(
     onLongPress: ((Post) -> Unit)? = null,
     /** Только у видимой папки: верх ленты на экране — новое просмотрено. */
     onTopSeen: ((Long) -> Unit)? = null,
+    /** Своя заглушка пустой ленты (у художника: «в режиме SFW у него пусто»). */
+    emptyContent: (@Composable () -> Unit)? = null,
     header: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -148,17 +152,25 @@ fun FeedList(
         if (dividerIndex <= 0) 0 else state.items.take(dividerIndex).sumOf { it.posts.size }
     }
 
+    val theme = app.dudebooru.ui.theme.LocalAppTheme.current
     PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = controller::refresh, modifier = modifier.fillMaxSize()) {
-        if (grid) {
+        val fatal = state.error
+        if (state.items.isEmpty() && fatal != null && !state.loading) {
+            Column(Modifier.fillMaxSize()) {
+                header?.invoke()
+                FeedErrorScreen(fatal, controller)
+            }
+        } else if (grid) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 state = gridState,
                 contentPadding = PaddingValues(bottom = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(theme.gridSpacing.dp),
+                verticalArrangement = Arrangement.spacedBy(theme.gridSpacing.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (header != null) item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
+                if (state.fromCache) item(key = "cache", span = { GridItemSpan(maxLineSpan) }) { CacheBanner(state, controller) }
                 val plan = state.plan
                 if (showPlan && plan != null && plan.serverTerms.isNotEmpty()) {
                     item(key = "plan", span = { GridItemSpan(maxLineSpan) }) { PlanRow(plan) }
@@ -171,11 +183,17 @@ fun FeedList(
                         onLongClick = { onLongPress?.invoke(item.lead) ?: actions.download(item.lead, original = true) },
                     )
                 }
-                item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { Footer(state, controller, context) }
+                if (state.items.isEmpty() && state.loading) {
+                    gridItems(List(12) { it }, key = { "skeleton$it" }) {
+                        Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainerHigh))
+                    }
+                }
+                item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { Footer(state, controller, context, actions, emptyContent) }
             }
         } else {
             LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 32.dp), modifier = Modifier.fillMaxSize()) {
                 if (header != null) item(key = "header") { header() }
+                if (state.fromCache) item(key = "cache") { CacheBanner(state, controller) }
                 if (state.hiddenCount > 0 && showHiddenMark) {
                     item(key = "hidden") { HiddenMark(state.hidden, actions) }
                 }
@@ -204,8 +222,13 @@ fun FeedList(
                 if (state.items.isEmpty() && state.loading) {
                     items(3) { SkeletonCard() }
                 }
-                item(key = "footer") { Footer(state, controller, context) }
+                item(key = "footer") { Footer(state, controller, context, actions, emptyContent) }
             }
+        }
+
+        // Дольше 3 секунд — бегущий Дуди и «Стучимся в Yande.re…».
+        if (state.items.isEmpty() && state.loading) {
+            app.dudebooru.ui.face.SlowLoadingHint(controller.site.name, Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp))
         }
 
         // «↑ 24 новых»: ушёл ниже нового — одним тапом наверх.
@@ -236,12 +259,18 @@ fun FeedList(
 }
 
 @Composable
-private fun Footer(state: FeedState, controller: FeedController, context: android.content.Context) {
+private fun Footer(
+    state: FeedState,
+    controller: FeedController,
+    context: android.content.Context,
+    actions: PostActions,
+    emptyContent: (@Composable () -> Unit)?,
+) {
     val error = state.error
     Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
         when {
             state.loading && state.items.isNotEmpty() -> CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
-            error != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            error != null && !state.fromCache -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(context.errorText(error), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
                 if (error !is BooruException.TooManyRequests) {
                     OutlinedButton(onClick = controller::retry, modifier = Modifier.padding(top = 12.dp)) {
@@ -249,7 +278,7 @@ private fun Footer(state: FeedState, controller: FeedController, context: androi
                     }
                 }
             }
-            state.endReached && state.items.isEmpty() -> EmptyFeed()
+            state.endReached && state.items.isEmpty() -> FeedEmpty(state, controller, actions, emptyContent)
             state.endReached && !controller.isLocal -> Text(stringResource(R.string.feed_end), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -297,8 +326,9 @@ private fun NewDivider() {
 private fun GridCell(item: FeedItem, onClick: () -> Unit, onLongClick: () -> Unit) {
     val context = LocalContext.current
     val censor = LocalCensor.current
+    val radius = app.dudebooru.ui.theme.LocalAppTheme.current.cornerRadius.coerceAtMost(16)
     Box(
-        Modifier.aspectRatio(1f).background(placeholderColor(item.lead))
+        Modifier.aspectRatio(1f).sharedPost(item.lead.key).clip(RoundedCornerShape(radius.dp)).background(placeholderColor(item.lead))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         if (censor.hides(item.lead)) {
@@ -346,14 +376,6 @@ private fun SkeletonCard() {
     }
 }
 
-@Composable
-private fun EmptyFeed() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 48.dp)) {
-        Text("(・・ ) ?", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(12.dp))
-        Text(stringResource(R.string.feed_empty), style = MaterialTheme.typography.bodyLarge)
-    }
-}
 
 /** Что ушло на сервер (сплошная обводка), что проверяется в приложении (пунктир). */
 @Composable

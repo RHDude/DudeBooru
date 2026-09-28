@@ -126,6 +126,7 @@ fun PostMenuButton(post: Post, group: List<Post>, actions: PostActions, tint: Co
             MenuRow(DudeIcons.Search, stringResource(R.string.menu_similar)) { close(); actions.findSimilar(post) }
             MenuRow(DudeIcons.Hide, stringResource(R.string.menu_not_interested)) { close(); actions.notInterested(post) }
             MenuRow(DudeIcons.User, stringResource(R.string.menu_make_avatar)) { close(); actions.makeAvatar(post) }
+            MenuRow(DudeIcons.Palette, stringResource(R.string.menu_theme_background)) { close(); actions.useAsBackground(post) }
             MenuRow(DudeIcons.Out, stringResource(R.string.menu_open_site)) { close(); actions.openOnSite(post) }
         }
     }

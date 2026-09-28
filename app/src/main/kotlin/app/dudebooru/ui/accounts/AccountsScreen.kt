@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -56,7 +57,14 @@ import app.dudebooru.data.settings.SyncPrefs
 import app.dudebooru.ui.icons.DudeIcons
 
 @Composable
-fun AccountsScreen(vm: AccountsViewModel, onBack: () -> Unit, onOpenNegativeTags: () -> Unit = {}) {
+fun AccountsScreen(
+    vm: AccountsViewModel,
+    onBack: () -> Unit,
+    onOpenNegativeTags: () -> Unit = {},
+    onOpenThemes: () -> Unit = {},
+    onOpenIcons: () -> Unit = {},
+    onOpenGame: () -> Unit = {},
+) {
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     val forms by vm.forms.collectAsStateWithLifecycle()
     val proxy by vm.proxy.collectAsStateWithLifecycle()
@@ -93,6 +101,7 @@ fun AccountsScreen(vm: AccountsViewModel, onBack: () -> Unit, onOpenNegativeTags
                 ContentCard(censorEnabled, censorPrefs, showHidden, vm::setCensorEnabled, vm::setCensorPrefs, vm::setShowHiddenCount, onOpenNegativeTags)
             }
             item(key = "feed") { FeedCard(feedPrefs, vm::setFeedPrefs) }
+            item(key = "look") { LookCard(onOpenThemes, onOpenIcons) }
             item {
                 Text(
                     stringResource(R.string.accounts_note),
@@ -116,6 +125,7 @@ fun AccountsScreen(vm: AccountsViewModel, onBack: () -> Unit, onOpenNegativeTags
                 val doh by vm.doh.collectAsStateWithLifecycle()
                 DohCard(doh, vm::setDoh)
             }
+            item(key = "about") { AboutCard(onOpenGame) }
         }
     }
 }
@@ -443,6 +453,60 @@ private fun DohCard(current: app.dudebooru.data.net.DohProvider, onChange: (app.
                     )
                 }
             }
+        }
+    }
+}
+
+/** Оформление: темы (пресеты, редактор, обмен, автоночь) и иконка приложения. */
+@Composable
+private fun LookCard(onOpenThemes: () -> Unit, onOpenIcons: () -> Unit) {
+    androidx.compose.material3.ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(vertical = 8.dp)) {
+            Text(
+                stringResource(R.string.settings_look),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            androidx.compose.material3.ListItem(
+                headlineContent = { Text(stringResource(R.string.drawer_themes)) },
+                supportingContent = { Text(stringResource(R.string.settings_look_themes_hint)) },
+                leadingContent = { Icon(DudeIcons.Palette, null) },
+                colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                modifier = Modifier.clickable(onClick = onOpenThemes),
+            )
+            androidx.compose.material3.ListItem(
+                headlineContent = { Text(stringResource(R.string.icon_picker_title)) },
+                leadingContent = { Icon(DudeIcons.Image, null) },
+                colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                modifier = Modifier.clickable(onClick = onOpenIcons),
+            )
+        }
+    }
+}
+
+/** О приложении: версия; семь тапов по ней открывают игру. */
+@Composable
+private fun AboutCard(onOpenGame: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var taps by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.compose.material3.ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.settings_version, app.dudebooru.BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().clickable {
+                    taps++
+                    if (taps >= 7) {
+                        taps = 0
+                        onOpenGame()
+                    } else if (taps >= 4) {
+                        android.widget.Toast.makeText(context, context.getString(R.string.game_egg_steps, 7 - taps), android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }.padding(vertical = 6.dp),
+            )
         }
     }
 }

@@ -1,5 +1,7 @@
 package app.dudebooru.ui.feed
 
+import app.dudebooru.ui.common.sharedPost
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -146,7 +148,9 @@ val LikeRed = Color(0xFFE5484D)
 @Composable
 private fun PostMedia(item: FeedItem, onPage: (Int) -> Unit, onTap: (Post) -> Unit, onDoubleTap: (Post) -> Unit) {
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    val radius = app.dudebooru.ui.theme.LocalAppTheme.current.cornerRadius
+    val shape = if (radius > 0) Modifier.padding(horizontal = 8.dp).clip(RoundedCornerShape(radius.dp)) else Modifier
+    BoxWithConstraints(Modifier.fillMaxWidth().then(shape)) {
         val natural = maxWidth / item.lead.aspectRatio.coerceAtLeast(0.05f)
         val maxHeight = screenHeight * 0.8f
         val height: Dp = min(natural, maxHeight)
@@ -232,6 +236,7 @@ private fun TapImage(
         Modifier
             .fillMaxWidth()
             .height(height)
+            .sharedPost(post.key)
             .background(placeholder)
             .pointerInput(post.key) {
                 detectTapGestures(

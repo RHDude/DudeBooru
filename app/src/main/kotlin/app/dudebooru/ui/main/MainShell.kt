@@ -15,6 +15,9 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -89,8 +92,13 @@ fun MainShell(vm: MainViewModel, actions: PostActions, dark: Boolean, onCloseApp
     ) {
         val site = folders.firstOrNull { it.id == selectedId }
         val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+        // Фон ленты из темы: цвет, градиент или картинка под прозрачной лентой.
+        val backdrop = app.dudebooru.ui.theme.LocalAppTheme.current.background
+        val withBackdrop = backdrop.kind != app.dudebooru.ui.theme.ThemeBackground.Kind.NONE
+        if (withBackdrop) app.dudebooru.ui.theme.ThemeBackdrop(backdrop, Modifier.fillMaxSize())
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            containerColor = if (withBackdrop) Color.Transparent else MaterialTheme.colorScheme.background,
             topBar = {
                 CenterAlignedTopAppBar(
                     navigationIcon = {
@@ -109,6 +117,14 @@ fun MainShell(vm: MainViewModel, actions: PostActions, dark: Boolean, onCloseApp
                         }
                     },
                     scrollBehavior = scrollBehavior,
+                    colors = if (withBackdrop) {
+                        TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
+                        )
+                    } else {
+                        TopAppBarDefaults.centerAlignedTopAppBarColors()
+                    },
                 )
             },
         ) { padding ->
@@ -123,6 +139,7 @@ fun MainShell(vm: MainViewModel, actions: PostActions, dark: Boolean, onCloseApp
                     onMarkSeen = vm::markAllSeen,
                     onHide = vm::hideFolder,
                     onMove = vm::moveFolder,
+                    stateOf = { vm.folderFeed(it).state },
                 )
                 Box(Modifier.fillMaxSize()) {
                     FolderPager(vm, folders, site, actions)
@@ -170,6 +187,7 @@ private fun FolderChips(
     onMarkSeen: (String) -> Unit,
     onHide: (String) -> Unit,
     onMove: (String, Int) -> Unit,
+    stateOf: (String) -> kotlinx.coroutines.flow.StateFlow<app.dudebooru.ui.feed.FeedState>,
 ) {
     val listState = rememberLazyListState()
     val index = folders.indexOfFirst { it.id == selectedId }
@@ -196,6 +214,15 @@ private fun FolderChips(
                             color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                         )
+                        // Ошибка касается только своей папки: на ней маленькая красная точка.
+                        val folderState by remember(folder.id) { stateOf(folder.id) }.collectAsStateWithLifecycle()
+                        if (folderState.error != null) {
+                            Spacer(Modifier.width(6.dp))
+                            Box(
+                                Modifier.size(7.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(MaterialTheme.colorScheme.error),
+                            )
+                        }
                         val count = counts[folder.id] ?: 0
                         if (count > 0) {
                             Spacer(Modifier.width(6.dp))

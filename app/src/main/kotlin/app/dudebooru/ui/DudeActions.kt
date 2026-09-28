@@ -27,8 +27,51 @@ class DudeActions(
     private val scope: CoroutineScope,
     /** Android 13+: спросить разрешение на уведомления перед первой загрузкой. */
     private val askNotifications: () -> Unit = {},
-) : PostActions {
+) : PostActions, app.dudebooru.ui.feed.FeedEnvironment {
     private val c get() = vm.c
+
+    // --- пустые экраны и ошибки ленты ---
+
+    override val online get() = c.connectivity.online
+    override val gameRecord get() = vm.gameRecord
+
+    override fun saveRecord(score: Int) = vm.saveGameRecord(score)
+
+    override fun openNegativeTags() = vm.navigate(Route.NegativeTags)
+
+    override fun openSettings() = vm.navigate(Route.Settings)
+
+    override fun openSite(site: app.dudebooru.booru.site.SiteConfig) {
+        runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(site.baseUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    /** Похожие теги для «ничего не нашли»: словарь по укороченному префиксу, ближайшие по написанию. */
+    override suspend fun similarTags(site: app.dudebooru.booru.site.SiteConfig, tag: String): List<String> {
+        val found = LinkedHashSet<String>()
+        var prefix = tag
+        while (prefix.length >= 3 && found.size < 12) {
+            c.tags.localSuggestions(site, prefix, 20).forEach { if (it.name != tag) found += it.name }
+            if (found.isEmpty()) runCatching { c.tags.remoteSuggestions(site, prefix, 20) }.getOrNull()?.forEach { if (it.name != tag) found += it.name }
+            if (found.isNotEmpty()) break
+            prefix = prefix.dropLast(if (prefix.length > 6) 2 else 1)
+        }
+        return found.sortedBy { app.dudebooru.ui.common.editDistance(it, tag) }.take(5)
+    }
+
+    override fun search(site: app.dudebooru.booru.site.SiteConfig, tags: List<String>) {
+        if (vm.stack.last() is Route.Results) vm.back()
+        vm.openSearchResults(site.id, tags)
+    }
+
+    /** Картинка поста — фоном своей темы: берём из кэша картинок и открываем редактор. */
+    override fun useAsBackground(post: Post) {
+        scope.launch {
+            val ok = vm.setThemeBackgroundFrom(context, post.sampleUrl ?: post.fileUrl ?: return@launch)
+            if (ok) vm.navigate(Route.ThemeEditor) else toast(context.getString(R.string.theme_bg_failed))
+        }
+    }
 
     /** Пост, для которого открыт лист «Не интересно…». */
     val notInterestedPost = MutableStateFlow<Post?>(null)

@@ -17,6 +17,10 @@ sealed interface Route {
     data object Artists : Route
     data object Downloads : Route
     data object Recs : Route
+    data object IconPicker : Route
+    data object Themes : Route
+    data object ThemeEditor : Route
+    data object Game : Route
     data class Similar(val controllerId: String, val post: app.dudebooru.booru.model.Post) : Route
     data class Soon(@StringRes val title: Int, val step: Int) : Route
 }

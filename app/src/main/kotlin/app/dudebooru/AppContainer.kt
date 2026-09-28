@@ -10,10 +10,12 @@ import app.dudebooru.data.collections.SubscriptionRepository
 import app.dudebooru.data.db.AppDatabase
 import app.dudebooru.data.downloads.DownloadRepository
 import app.dudebooru.data.filter.NegativeTags
+import app.dudebooru.data.net.Connectivity
 import app.dudebooru.data.net.DynamicDns
 import app.dudebooru.data.net.DynamicProxySelector
 import app.dudebooru.data.posts.ArtistAvatars
 import app.dudebooru.data.posts.Downloader
+import app.dudebooru.data.posts.FeedSnapshots
 import app.dudebooru.data.posts.PostRepository
 import app.dudebooru.data.rec.RecommendationRepository
 import app.dudebooru.data.secure.SecretStore
@@ -71,6 +73,10 @@ class AppContainer(app: Application) {
     val negative = NegativeTags(db.negativeTags(), tags, registry, accounts, scope)
 
     val posts = PostRepository(registry, accounts, db, tags, negative)
+
+    val connectivity = Connectivity(app)
+
+    val snapshots = FeedSnapshots(java.io.File(app.cacheDir, "feeds"))
 
     val avatars = ArtistAvatars(registry, accounts, db.artistAvatars(), negative)
 

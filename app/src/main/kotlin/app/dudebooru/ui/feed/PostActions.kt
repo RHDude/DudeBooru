@@ -22,6 +22,9 @@ interface PostActions {
     fun findSimilar(post: Post)
     fun notInterested(post: Post)
     fun makeAvatar(post: Post)
+
+    /** Картинка поста — фоном своей темы. */
+    fun useAsBackground(post: Post) {}
     suspend fun pools(post: Post): List<PoolInfo>
     fun openPool(post: Post, pool: PoolInfo)
     fun searchTag(post: Post, tag: String, add: Boolean)

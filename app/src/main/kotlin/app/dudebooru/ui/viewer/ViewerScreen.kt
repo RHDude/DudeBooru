@@ -2,6 +2,8 @@
 
 package app.dudebooru.ui.viewer
 
+import app.dudebooru.ui.common.sharedPost
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -156,6 +158,7 @@ fun ViewerScreen(
             HorizontalPager(state = pager, key = { slots[it].post.key }, beyondViewportPageCount = 1, modifier = Modifier.fillMaxSize()) { page ->
                 val post = slots[page].post
                 val censor = LocalCensor.current
+                Box(Modifier.fillMaxSize().sharedPost(post.key, enabled = page == pager.currentPage)) {
                 when {
                     censor.hides(post, inViewer = true) -> CensoredImage(
                         post = post,
@@ -165,6 +168,7 @@ fun ViewerScreen(
                     )
                     post.mediaType == MediaType.VIDEO -> VideoPage(post, active = page == pager.currentPage, onTap = { barsVisible = !barsVisible })
                     else -> ZoomPage(post, onTap = { barsVisible = !barsVisible })
+                }
                 }
             }
         }
