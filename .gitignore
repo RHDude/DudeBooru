@@ -11,3 +11,7 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+# Ключ подписи выпусков — только у владельца
+*.p12
+*.pk8
+DudeBooru-signing-key.txt
