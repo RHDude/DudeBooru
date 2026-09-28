@@ -377,6 +377,7 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                             ViewerScreen(
                                 controller = controller,
                                 startKey = route.startKey,
+                                wholeFeed = route.wholeFeed,
                                 actions = actions,
                                 onClose = { vm.back() },
                                 onSearchTag = { post, tag, add ->

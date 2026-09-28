@@ -21,6 +21,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DrawerDefaults
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.SegmentedButton
@@ -56,7 +60,7 @@ import coil3.compose.AsyncImage
 /** Боковое меню по макету: шапка с аватаркой и темой, быстрые переключатели, пункты. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, onCloseApp: () -> Unit) {
+fun DudeDrawer(vm: MainViewModel, drawerState: DrawerState, dark: Boolean, onNavigate: (Route) -> Unit, onCloseApp: () -> Unit) {
     val profile by vm.profile.collectAsStateWithLifecycle()
     val mode by vm.mode.collectAsStateWithLifecycle()
     val censor by vm.censor.collectAsStateWithLifecycle()
@@ -68,7 +72,15 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
     var accountsOpen by rememberSaveable { mutableStateOf(false) }
 
     val look = app.dudebooru.ui.theme.LocalAppTheme.current
-    ModalDrawerSheet(drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) {
+    // Меню открывается пружиной и на миг перелетает вправо. Вариант с drawerState растягивает лист
+    // на этот перелёт, а заливка слева от листа — страховка: у левого края не мелькает щель.
+    val sheetColor = DrawerDefaults.modalContainerColor
+    ModalDrawerSheet(
+        drawerState = drawerState,
+        drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
+        drawerContainerColor = sheetColor,
+        modifier = Modifier.drawBehind { drawRect(sheetColor, topLeft = Offset(-size.width, 0f), size = size) },
+    ) {
         Box {
             // Фон меню из темы — тот же, что у ленты.
             if (look.background.kind != app.dudebooru.ui.theme.ThemeBackground.Kind.NONE) {

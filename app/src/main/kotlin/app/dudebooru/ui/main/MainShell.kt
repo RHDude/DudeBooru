@@ -96,6 +96,7 @@ fun MainShell(vm: MainViewModel, actions: PostActions, dark: Boolean, onCloseApp
         drawerContent = {
             DudeDrawer(
                 vm = vm,
+                drawerState = drawer,
                 dark = dark,
                 // Меню не закрываем анимацией: экран с ним и так уходит под новый, а два движения сразу
                 // (меню уезжает, экраны меняются) выглядели как рывок. Вернёмся — меню уже закрыто.

@@ -535,6 +535,7 @@
 • Video player: seekable progress bar, time, pause and sound
 • Videos and GIFs are marked differently in the feed and the grid
 • Tap the open folder to jump to the top
+• The viewer swipes only through the opened post’s pictures, not other works
 • New “Teto” theme
 • Sakugabooru removed from the sources</string>
     <!-- Settings: sources, viewer, privacy, data, about -->

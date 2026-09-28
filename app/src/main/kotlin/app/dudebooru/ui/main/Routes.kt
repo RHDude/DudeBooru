@@ -7,7 +7,8 @@ sealed interface Route {
     data object Main : Route
     data class Search(val siteId: String, val initial: String = "") : Route
     data class Results(val controllerId: String) : Route
-    data class Viewer(val controllerId: String, val startKey: String) : Route
+    /** [wholeFeed] — листать всю ленту («Случайный пост»); иначе только картинки открытого поста. */
+    data class Viewer(val controllerId: String, val startKey: String, val wholeFeed: Boolean = false) : Route
     data class Artist(val controllerId: String, val siteId: String, val name: String) : Route
     /** Настройки: без раздела — список разделов. */
     data class Settings(val page: SettingsPage? = null) : Route

@@ -277,7 +277,7 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
         // Прошлые случайные подборки больше не нужны: «Случайный пост» открывается только с главного экрана.
         controllers.keys.removeAll { it.startsWith("random:") }
         controllers[controller.id] = controller
-        return Route.Viewer(controller.id, startKey = "")
+        return Route.Viewer(controller.id, startKey = "", wholeFeed = true)
     }
 
     /** Новые с прошлого визита: посты свежее последнего увиденного, до 99. */
