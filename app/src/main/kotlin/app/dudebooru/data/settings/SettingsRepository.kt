@@ -154,7 +154,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     val profile: Flow<Profile> = store.data.map { prefs ->
         Profile(
-            name = prefs[PROFILE_NAME] ?: DEFAULT_NAME,
+            // Пустое имя — показывается «Чувак» / «Dude» на языке интерфейса.
+            name = prefs[PROFILE_NAME].orEmpty(),
             nick = prefs[PROFILE_NICK] ?: DEFAULT_NICK,
             avatarUrl = prefs[PROFILE_AVATAR],
         )
@@ -241,7 +242,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun setProfile(name: String, nick: String) {
         store.edit {
-            it[PROFILE_NAME] = name.ifBlank { DEFAULT_NAME }
+            if (name.isBlank()) it.remove(PROFILE_NAME) else it[PROFILE_NAME] = name.trim()
             it[PROFILE_NICK] = nick.removePrefix("@").ifBlank { DEFAULT_NICK }
         }
     }
@@ -357,6 +358,34 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         store.edit { it[DOH] = provider.name }
     }
 
+    /** Настройки → Уведомления: новые работы у подписок (колокольчик у художника — поверх этого). */
+    val notifyArtists: Flow<Boolean> = store.data.map { it[NOTIFY_ARTISTS] ?: true }
+
+    suspend fun setNotifyArtists(value: Boolean) {
+        store.edit { it[NOTIFY_ARTISTS] = value }
+    }
+
+    /** Настройки → Уведомления: вышла новая версия. */
+    val notifyUpdates: Flow<Boolean> = store.data.map { it[NOTIFY_UPDATES] ?: true }
+
+    suspend fun setNotifyUpdates(value: Boolean) {
+        store.edit { it[NOTIFY_UPDATES] = value }
+    }
+
+    /** Версия, о которой уже было уведомление: о каждой — один раз. */
+    val notifiedVersion: Flow<String?> = store.data.map { it[NOTIFIED_VERSION] }
+
+    suspend fun setNotifiedVersion(value: String) {
+        store.edit { it[NOTIFIED_VERSION] = value }
+    }
+
+    /** Когда проверяли обновления: при запуске — не чаще раза в 12 часов. */
+    val lastUpdateCheck: Flow<Long> = store.data.map { it[LAST_UPDATE_CHECK] ?: 0L }
+
+    suspend fun setLastUpdateCheck(value: Long) {
+        store.edit { it[LAST_UPDATE_CHECK] = value }
+    }
+
     private fun sortKey(siteId: String) = stringPreferencesKey("sort.$siteId")
 
     private companion object {
@@ -398,8 +427,11 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val OVERRIDE_UNTIL = longPreferencesKey("night_override_until")
         val ONBOARDED = androidx.datastore.preferences.core.booleanPreferencesKey("onboarded")
         val GAME_RECORD = androidx.datastore.preferences.core.intPreferencesKey("game_record")
+        val NOTIFY_ARTISTS = androidx.datastore.preferences.core.booleanPreferencesKey("notify_artists")
+        val NOTIFY_UPDATES = androidx.datastore.preferences.core.booleanPreferencesKey("notify_updates")
+        val NOTIFIED_VERSION = stringPreferencesKey("notified_version")
+        val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
 
-        const val DEFAULT_NAME = "Чувак"
         const val DEFAULT_NICK = "dude"
 
         /** Sakugabooru включается в настройках. */

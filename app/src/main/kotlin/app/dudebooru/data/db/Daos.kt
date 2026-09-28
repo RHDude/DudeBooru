@@ -178,6 +178,9 @@ interface SubscriptionDao {
     @Query("SELECT EXISTS(SELECT 1 FROM subscriptions WHERE site = :site AND artist = :artist)")
     fun isSubscribed(site: String, artist: String): Flow<Boolean>
 
+    @Query("SELECT * FROM subscriptions WHERE site = :site AND artist = :artist")
+    fun observe(site: String, artist: String): Flow<SubscriptionEntity?>
+
     @Upsert
     suspend fun upsert(entry: SubscriptionEntity)
 
@@ -187,8 +190,20 @@ interface SubscriptionDao {
     @Query("UPDATE subscriptions SET newCount = :count, checkedAt = :at WHERE site = :site AND artist = :artist")
     suspend fun setNewCount(site: String, artist: String, count: Int, at: Long)
 
-    @Query("UPDATE subscriptions SET lastSeenId = MAX(lastSeenId, :id), newCount = 0 WHERE site = :site AND artist = :artist")
+    /** Увиденное не присылается и уведомлением. */
+    @Query(
+        """
+        UPDATE subscriptions SET lastSeenId = MAX(lastSeenId, :id), notifiedId = MAX(notifiedId, :id), newCount = 0
+        WHERE site = :site AND artist = :artist
+        """,
+    )
     suspend fun markSeen(site: String, artist: String, id: Long)
+
+    @Query("UPDATE subscriptions SET notify = :notify WHERE site = :site AND artist = :artist")
+    suspend fun setNotify(site: String, artist: String, notify: Boolean)
+
+    @Query("UPDATE subscriptions SET notifiedId = MAX(notifiedId, :id) WHERE site = :site AND artist = :artist")
+    suspend fun markNotified(site: String, artist: String, id: Long)
 }
 
 @Dao

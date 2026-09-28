@@ -2,7 +2,11 @@ package app.dudebooru.ui.feed
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,7 +55,7 @@ fun ArtistAvatar(post: Post, size: Dp = 36.dp, actions: PostActions? = LocalPost
         )
         if (url != null) {
             // Вырезка из работы в NSFW-режиме тоже может быть откровенной: при цензуре — размытое пятно.
-            val censored = LocalCensor.current.let { it.enabled && it.mode != app.dudebooru.booru.model.ContentMode.SFW }
+            val censored = LocalCensor.current.blursAvatars
             val context = androidx.compose.ui.platform.LocalContext.current
             AsyncImage(
                 model = coil3.request.ImageRequest.Builder(context).data(url).apply { if (censored) size(10) }.build(),
@@ -66,6 +70,52 @@ fun ArtistAvatar(post: Post, size: Dp = 36.dp, actions: PostActions? = LocalPost
 
 val LocalPostActions = androidx.compose.runtime.staticCompositionLocalOf<PostActions?> { null }
 
+/**
+ * Кнопка под постом, как у Twitter и VK: крупная иконка в мягкой «пилюле».
+ * Нажатое состояние (лайк, сохранено) подсвечивает пилюлю своим цветом, лайк ещё и «подпрыгивает».
+ */
+@Composable
+fun ActionPill(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    active: Boolean = false,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    container: Color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f),
+    bounce: Boolean = false,
+) {
+    val scale = remember { androidx.compose.animation.core.Animatable(1f) }
+    var previous by remember { mutableStateOf(active) }
+    LaunchedEffect(active) {
+        val jump = bounce && active && !previous
+        previous = active
+        scale.snapTo(1f)
+        if (jump) {
+            scale.animateTo(1.3f, androidx.compose.animation.core.tween(110))
+            scale.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 500f))
+        }
+    }
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+        color = if (active) activeColor.copy(alpha = 0.16f) else container,
+        modifier = Modifier.height(40.dp).widthIn(min = 58.dp),
+    ) {
+        Box(Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+            Icon(
+                icon,
+                contentDescription,
+                tint = if (active) activeColor else tint,
+                modifier = Modifier.size(24.dp).graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
+                },
+            )
+        }
+    }
+}
+
 private val AvatarPalette = listOf(
     Color(0xFF2F6FDE), Color(0xFF8E44AD), Color(0xFF1E8A4C), Color(0xFFC0392B),
     Color(0xFFD9822B), Color(0xFF2BB5A8), Color(0xFF6D4C9F), Color(0xFF3D7EA6),
@@ -74,15 +124,18 @@ private val AvatarPalette = listOf(
 /** Цвет стабильный, от хеша имени. */
 fun avatarColor(name: String): Color = AvatarPalette[Math.floorMod(name.hashCode(), AvatarPalette.size)]
 
-/** «1.2 МБ», «18 МБ», «640 КБ». */
+/** «1.2 МБ», «18 МБ», «640 КБ» — единицы на языке интерфейса (он же язык процесса). */
 fun formatSize(bytes: Long?): String? {
     if (bytes == null || bytes <= 0) return null
     val kb = bytes / 1024.0
     val mb = kb / 1024.0
+    val ru = Locale.getDefault().language == "ru"
+    val mbUnit = if (ru) "МБ" else "MB"
+    val kbUnit = if (ru) "КБ" else "KB"
     return when {
-        mb >= 10 -> String.format(Locale.ROOT, "%.0f МБ", mb)
-        mb >= 1 -> String.format(Locale.ROOT, "%.1f МБ", mb)
-        else -> String.format(Locale.ROOT, "%.0f КБ", kb)
+        mb >= 10 -> String.format(Locale.ROOT, "%.0f %s", mb, mbUnit)
+        mb >= 1 -> String.format(Locale.ROOT, "%.1f %s", mb, mbUnit)
+        else -> String.format(Locale.ROOT, "%.0f %s", kb, kbUnit)
     }
 }
 

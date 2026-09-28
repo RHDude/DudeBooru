@@ -89,7 +89,7 @@ fun SearchScreen(vm: SearchViewModel, initial: String, onBack: () -> Unit, onSea
                 value = text,
                 onValueChange = {
                     text = it
-                    vm.onInput(it.substringAfterLast(' ').ifEmpty { it })
+                    vm.onInput(it)
                 },
                 placeholder = { Text(stringResource(R.string.search_in, vm.site.name)) },
                 singleLine = true,
@@ -150,11 +150,10 @@ fun SearchScreen(vm: SearchViewModel, initial: String, onBack: () -> Unit, onSea
             } else {
                 items(suggestions, key = { "s:" + it.name }) { tag ->
                     SuggestionRow(tag, tagColors.of(tag.category)) {
-                        val word = text.substringAfterLast(' ')
-                        val sign = word.takeWhile { it == '-' || it == '~' }
-                        chips += sign + tag.name
+                        val typed = text
                         text = ""
                         vm.onInput("")
+                        scope.launch { vm.accept(typed, tag.name).forEach { if (it !in chips) chips += it } }
                     }
                 }
             }

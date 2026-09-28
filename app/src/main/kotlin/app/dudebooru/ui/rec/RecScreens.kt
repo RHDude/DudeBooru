@@ -82,8 +82,9 @@ fun RecsScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit) {
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Text("(๑•̀ㅂ•́)و✧", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                            val left = (vm.c.recs.coldStartLikes - likes).coerceAtLeast(1)
                             Text(
-                                stringResource(R.string.recs_cold, (vm.c.recs.coldStartLikes - likes).coerceAtLeast(1)),
+                                androidx.compose.ui.res.pluralStringResource(R.plurals.recs_cold, left, left),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )

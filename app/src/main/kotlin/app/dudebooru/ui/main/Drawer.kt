@@ -80,7 +80,7 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
                     Column {
                         Avatar(profile?.avatarUrl, Modifier.size(64.dp).clickable { onNavigate(Route.Settings) })
                         Spacer(Modifier.height(12.dp))
-                        Text(profile?.name.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(profile.displayName(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Row(
                             Modifier.fillMaxWidth().clickable { accountsOpen = !accountsOpen }.padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -200,6 +200,13 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
                 HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 6.dp))
                 DrawerItem(DudeIcons.Palette, R.string.drawer_themes) { onNavigate(Route.Themes) }
                 DrawerItem(DudeIcons.Gear, R.string.drawer_settings) { onNavigate(Route.Settings) }
+                // Вышла новая версия — пункт появляется сам, тап открывает «что нового» и установку.
+                val update by vm.updates.state.collectAsStateWithLifecycle()
+                (update as? app.dudebooru.ui.update.UpdateState.Available)?.let { available ->
+                    DrawerItem(DudeIcons.Download, stringResource(R.string.drawer_update, available.release.version), badge = "new", highlight = true) {
+                        vm.updates.openDialog()
+                    }
+                }
                 DrawerItem(DudeIcons.Off, R.string.drawer_close_app, onClick = onCloseApp)
             }
         }
@@ -208,9 +215,14 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
 
 @Composable
 private fun DrawerItem(icon: ImageVector, label: Int, badge: String? = null, highlight: Boolean = false, onClick: () -> Unit) {
+    DrawerItem(icon, stringResource(label), badge, highlight, onClick)
+}
+
+@Composable
+private fun DrawerItem(icon: ImageVector, label: String, badge: String? = null, highlight: Boolean = false, onClick: () -> Unit) {
     NavigationDrawerItem(
         icon = { Icon(icon, null) },
-        label = { Text(stringResource(label)) },
+        label = { Text(label) },
         badge = badge?.let {
             {
                 if (highlight) {
@@ -225,6 +237,15 @@ private fun DrawerItem(icon: ImageVector, label: Int, badge: String? = null, hig
         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding).height(48.dp),
     )
 }
+
+/** Имя из профиля; пустое (и прежнее «Чувак» по умолчанию) — на языке интерфейса. */
+@Composable
+fun app.dudebooru.data.settings.Profile?.displayName(): String {
+    val name = this?.name?.trim().orEmpty()
+    return if (name.isEmpty() || name == LEGACY_DEFAULT_NAME) stringResource(R.string.profile_default_name) else name
+}
+
+private const val LEGACY_DEFAULT_NAME = "Чувак"
 
 /** Своя аватарка из поста или галереи; пока её нет — градиентный круг. */
 @Composable

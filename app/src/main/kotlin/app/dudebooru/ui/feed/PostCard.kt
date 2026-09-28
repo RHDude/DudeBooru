@@ -37,7 +37,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -118,23 +120,30 @@ fun PostCard(item: FeedItem, controller: FeedController, actions: PostActions, m
             onDoubleTap = { actions.doubleTapLike(it) },
         )
 
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Кнопки как у Twitter и VK: крупные, с воздухом; ♥ слева, «поделиться» и «сохранить» справа.
+        Row(
+            Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             val liked = current.key in collections.liked
-            IconButton(onClick = { actions.toggleLike(current) }) {
-                Icon(
-                    if (liked) DudeIcons.HeartFilled else DudeIcons.Heart,
-                    stringResource(R.string.action_like),
-                    tint = if (liked) LikeRed else MaterialTheme.colorScheme.primary,
-                )
-            }
+            ActionPill(
+                icon = if (liked) DudeIcons.HeartFilled else DudeIcons.Heart,
+                contentDescription = stringResource(R.string.action_like),
+                onClick = { actions.toggleLike(current) },
+                active = liked,
+                activeColor = LikeRed,
+                bounce = true,
+            )
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { actions.share(current) }) {
-                Icon(DudeIcons.Share, stringResource(R.string.action_share), tint = MaterialTheme.colorScheme.primary)
-            }
+            ActionPill(DudeIcons.Share, stringResource(R.string.action_share), onClick = { actions.share(current) })
             val saved = current.key in collections.saved
-            IconButton(onClick = { actions.toggleSave(current) }) {
-                Icon(if (saved) DudeIcons.SaveFilled else DudeIcons.Save, stringResource(R.string.action_save), tint = MaterialTheme.colorScheme.primary)
-            }
+            ActionPill(
+                icon = if (saved) DudeIcons.SaveFilled else DudeIcons.Save,
+                contentDescription = stringResource(R.string.action_save),
+                onClick = { actions.toggleSave(current) },
+                active = saved,
+            )
         }
     }
 }
@@ -265,6 +274,23 @@ private fun TapImage(
                 onReveal = { actions?.reveal(post) },
             )
         } else {
+            if (fit) {
+                // Картинка другого формата в карусели: поля вокруг заполняет она же, размытая и притемнённая,
+                // как в Telegram, — вместо серой пустоты под прижатой к верху картинкой.
+                AsyncImage(
+                    model = ImageRequest.Builder(context).data(post.previewUrl ?: post.sampleUrl).size(32).build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    filterQuality = androidx.compose.ui.graphics.FilterQuality.Low,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.blur(24.dp) else Modifier)
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(Color.Black.copy(alpha = 0.28f))
+                        },
+                )
+            }
             AsyncImage(
                 // GIF в ленте анимируются из оригинала (опция в настройках).
                 model = ImageRequest.Builder(context)
@@ -273,7 +299,8 @@ private fun TapImage(
                     .build(),
                 contentDescription = post.tags.character.joinToString(", ").ifEmpty { null },
                 contentScale = if (fit) ContentScale.Fit else ContentScale.Crop,
-                alignment = Alignment.TopCenter,
+                // Вписанная — по центру; обрезанная — по верху, чтобы не резать лица.
+                alignment = if (fit) Alignment.Center else Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize(),
             )
         }

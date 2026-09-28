@@ -25,9 +25,11 @@ class DudeActions(
     private val context: Context,
     private val vm: MainViewModel,
     private val scope: CoroutineScope,
-    /** Android 13+: спросить разрешение на уведомления перед первой загрузкой. */
-    private val askNotifications: () -> Unit = {},
+    /** Android 13+: спросить разрешение на уведомления (перед первой загрузкой, при подписке на художника). */
+    private val requestNotificationPermission: () -> Unit = {},
 ) : PostActions, app.dudebooru.ui.feed.FeedEnvironment {
+
+    override fun askNotifications() = requestNotificationPermission()
     private val c get() = vm.c
 
     // --- пустые экраны и ошибки ленты ---
@@ -80,7 +82,14 @@ class DudeActions(
     private fun engine(post: Post) = c.registry.engine(site(post))
     private fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
 
-    override fun open(controller: FeedController, post: Post) = vm.navigate(Route.Viewer(controller.id, post.key))
+    /** Сначала карточка получает общий элемент, кадром позже открывается просмотр — картинка перелетает из неё. */
+    override fun open(controller: FeedController, post: Post) {
+        vm.sharedKey.value = post.key
+        scope.launch {
+            androidx.compose.runtime.withFrameNanos { }
+            vm.navigate(Route.Viewer(controller.id, post.key))
+        }
+    }
 
     override fun toggleLike(post: Post) = vm.toggleLike(post)
 
@@ -208,8 +217,11 @@ class DudeActions(
         return c.avatars.cached(site(post), artist, vm.mode.value)
     }
 
+    /** Запрос и разбор ответа — не в главном потоке: аватарки грузятся прямо во время прокрутки. */
     override suspend fun loadAvatar(post: Post): String? {
         val artist = post.tags.artist.firstOrNull() ?: return null
-        return c.avatars.url(site(post), artist, vm.mode.value)
+        val site = site(post)
+        val mode = vm.mode.value
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { c.avatars.url(site, artist, mode) }
     }
 }

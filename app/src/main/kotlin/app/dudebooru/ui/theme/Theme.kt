@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -125,13 +126,21 @@ class ThemeReveal {
     internal val radius = Animatable(0f)
     internal var reducedMotion = false
 
+    /** Экран пишется в слой только на время снимка: постоянная запись отнимала время у каждого кадра прокрутки. */
+    internal var capturing by mutableStateOf(false)
+
     suspend fun run(from: Offset, apply: () -> Unit) {
         val current = layer
         if (current == null || reducedMotion) {
             apply()
             return
         }
+        capturing = true
+        // Кадр, в котором экран записан в слой, и ещё один — чтобы запись точно закончилась.
+        withFrameNanos { }
+        withFrameNanos { }
         snapshot = runCatching { current.toImageBitmap() }.getOrNull()
+        capturing = false
         center = from
         radius.snapTo(0f)
         apply()
@@ -160,8 +169,12 @@ fun ThemeRevealHost(reveal: ThemeReveal, content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxSize().drawWithContent {
-                layer.record { this@drawWithContent.drawContent() }
-                drawLayer(layer)
+                if (reveal.capturing) {
+                    layer.record { this@drawWithContent.drawContent() }
+                    drawLayer(layer)
+                } else {
+                    drawContent()
+                }
             },
         ) {
             CompositionLocalProvider(LocalThemeReveal provides reveal, content = content)

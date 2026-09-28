@@ -48,6 +48,9 @@ interface PostActions {
     /** Аватарка художника: из памяти сразу, иначе догрузка. */
     fun cachedAvatar(post: Post): String?
     suspend fun loadAvatar(post: Post): String?
+
+    /** Android 13+: спросить разрешение на уведомления, если его ещё нет. */
+    fun askNotifications() {}
 }
 
 /** Лайки и сохранённые — ключи `site:id`, чтобы карточки перерисовывались без запросов в базу. */

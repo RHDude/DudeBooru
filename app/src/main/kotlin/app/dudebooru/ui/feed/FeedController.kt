@@ -78,6 +78,10 @@ class FeedController(
     private val localSource: kotlinx.coroutines.flow.Flow<List<Post>>? = null,
     /** Свой источник: рекомендации, «похожие». */
     private val customSource: CustomSource? = null,
+    /** Постов за запрос: «случайному» хватает поменьше — первый пост появляется быстрее. */
+    private val pageSize: Int = 40,
+    /** Сколько постов должно остаться после фильтров, чтобы не догружать следующую страницу сразу. */
+    private val minVisible: Int = 12,
 ) {
     private val _state = MutableStateFlow(FeedState())
     val state: StateFlow<FeedState> = _state.asStateFlow()
@@ -196,6 +200,8 @@ class FeedController(
                         request = FeedRequest(tags = key.tags, sort = key.sort, mode = key.mode),
                         cursor = if (reset) null else current.next,
                         seen = seen,
+                        pageSize = pageSize,
+                        minVisible = minVisible,
                     )
                 }
                 val fresh = PostGrouper.group(chunk.posts).map { FeedItem(it) }

@@ -87,6 +87,7 @@ import app.dudebooru.ui.icons.DudeIcons
 import app.dudebooru.ui.main.Avatar
 import app.dudebooru.ui.main.CountBadge
 import app.dudebooru.ui.main.MainViewModel
+import app.dudebooru.ui.main.displayName
 import app.dudebooru.ui.theme.LocalTagColors
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -227,7 +228,7 @@ fun BulkDownloadDialog(posts: List<Post>, onDismiss: () -> Unit, onConfirm: () -
     val free = remember { runCatching { StatFs(Environment.getExternalStorageDirectory().path).availableBytes }.getOrNull() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.bulk_title, posts.size)) },
+        title = { Text(androidx.compose.ui.res.pluralStringResource(R.plurals.bulk_title, posts.size, posts.size)) },
         text = {
             Column {
                 Text(stringResource(R.string.bulk_size, formatSize(total) ?: "—") + if (unknown > 0) " " + stringResource(R.string.bulk_unknown, unknown) else "")
@@ -243,17 +244,17 @@ fun BulkDownloadDialog(posts: List<Post>, onDismiss: () -> Unit, onConfirm: () -
 // ---------------------------------------------------------------------------------------------
 // Профиль
 
-/** Мой профиль: аватарка, ник, статистика; вкладки «Лайки», «История», «Загрузки»; «Мои теги». */
+/**
+ * Мой профиль: аватарка, ник, статистика; «Мои теги»; вкладки «Лайки», «История», «Загрузки».
+ * Всё в одной прокрутке: шапка уезжает вместе с сеткой, экран не делится на две половины.
+ */
 @Composable
 fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, onEdit: () -> Unit) {
-    val profile by vm.profile.collectAsStateWithLifecycle()
-    val likes by vm.likeCount.collectAsStateWithLifecycle()
-    val saved by vm.savedCount.collectAsStateWithLifecycle()
     val downloads by vm.downloads.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val likedFeed = remember { vm.localFeed("likes", vm.decodePosts(vm.c.db.saved().likedPosts())) }
     val historyFeed = remember { vm.localFeed("history", vm.decodePosts(vm.c.db.history().recentPosts())) }
-    val liked by likedFeed.state.collectAsStateWithLifecycle()
+    val header: @Composable () -> Unit = { ProfileHeader(vm, tab, onTab = { tab = it }, onEdit = onEdit) }
 
     Scaffold(
         topBar = {
@@ -264,60 +265,111 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
             )
         },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().clickable(onClick = onEdit).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Avatar(profile?.avatarUrl, Modifier.size(72.dp))
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text(profile?.name.orEmpty(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("@" + profile?.nick.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            when (tab) {
+                0 -> FeedList(
+                    likedFeed,
+                    actions,
+                    grid = true,
+                    header = header,
+                    emptyContent = { EmptyState(rememberKaomoji(listOf("(´･ω･`)") + Kaomoji.BORED), stringResource(R.string.likes_empty), null) },
+                )
+                1 -> FeedList(
+                    historyFeed,
+                    actions,
+                    grid = true,
+                    header = header,
+                    emptyContent = { EmptyState(rememberKaomoji(listOf("( ˘ω˘ )") + Kaomoji.BORED), stringResource(R.string.history_empty), null) },
+                )
+                else -> DownloadsList(vm, downloads, header)
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceAround) {
-                Stat(likes, R.string.profile_likes)
-                Stat(saved, R.string.profile_saved)
-                Stat(downloads.count { it.status == DownloadStatus.DONE }, R.string.profile_downloaded)
+        }
+    }
+}
+
+/** Шапка профиля — первый элемент ленты вкладки. */
+@Composable
+private fun ProfileHeader(vm: MainViewModel, tab: Int, onTab: (Int) -> Unit, onEdit: () -> Unit) {
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    val likes by vm.likeCount.collectAsStateWithLifecycle()
+    val saved by vm.savedCount.collectAsStateWithLifecycle()
+    val downloads by vm.downloads.collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onEdit).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Avatar(profile?.avatarUrl, Modifier.size(72.dp))
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(profile.displayName(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text("@" + profile?.nick.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            // «Мои теги»: что приложение считает твоим вкусом; долгое нажатие — убрать лишнее.
-            val scope = rememberCoroutineScope()
-            var tasteVersion by remember { mutableIntStateOf(0) }
-            val myTags by produceState(emptyList<app.dudebooru.booru.rec.TasteTag>(), liked.items.size, tasteVersion) {
-                value = runCatching { vm.c.recs.profile().top(limit = 20) }.getOrDefault(emptyList())
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceAround) {
+            Stat(likes, R.string.profile_likes)
+            Stat(saved, R.string.profile_saved)
+            Stat(downloads.count { it.status == DownloadStatus.DONE }, R.string.profile_downloaded)
+        }
+        MyTags(vm, likes)
+        PrimaryTabRow(selectedTabIndex = tab, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+            listOf(R.string.profile_likes, R.string.drawer_history, R.string.drawer_downloads).forEachIndexed { i, label ->
+                Tab(selected = tab == i, onClick = { onTab(i) }, text = { Text(stringResource(label)) })
             }
-            if (myTags.isNotEmpty()) {
-                val colors = LocalTagColors.current
-                Text(stringResource(R.string.profile_my_tags), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 2.dp))
-                Text(stringResource(R.string.profile_my_tags_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, bottom = 6.dp))
-                FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    myTags.forEach { tag ->
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = colors.of(tag.category).copy(alpha = 0.12f),
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(onClick = {}, onLongClick = {
-                                scope.launch {
-                                    vm.c.recs.mute(tag.name)
-                                    tasteVersion++
-                                }
-                            }),
-                        ) {
-                            Text(tag.name.replace('_', ' '), color = colors.of(tag.category), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
-                        }
+        }
+    }
+}
+
+/** «Мои теги»: что приложение считает твоим вкусом. Свёрнуты в одну строку; долгое нажатие — убрать лишнее. */
+@Composable
+private fun MyTags(vm: MainViewModel, likes: Int) {
+    val scope = rememberCoroutineScope()
+    var tasteVersion by remember { mutableIntStateOf(0) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val myTags by produceState(emptyList<app.dudebooru.booru.rec.TasteTag>(), likes, tasteVersion) {
+        value = runCatching { vm.c.recs.profile().top(limit = 20) }.getOrDefault(emptyList())
+    }
+    if (myTags.isEmpty()) return
+    val colors = LocalTagColors.current
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp).clickable { expanded = !expanded }.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.profile_my_tags), style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.width(8.dp))
+        CountBadge(myTags.size.toString(), highlighted = false)
+        Spacer(Modifier.weight(1f))
+        if (!expanded) {
+            Text(
+                myTags.take(3).joinToString(" · ") { it.name.replace('_', ' ') },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp, end = 4.dp),
+            )
+        }
+        Icon(
+            if (expanded) DudeIcons.ChevronUp else DudeIcons.ChevronDown,
+            stringResource(if (expanded) R.string.collapse else R.string.expand),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    androidx.compose.animation.AnimatedVisibility(expanded) {
+        Column {
+            Text(stringResource(R.string.profile_my_tags_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, bottom = 6.dp))
+            FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                myTags.forEach { tag ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = colors.of(tag.category).copy(alpha = 0.12f),
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(onClick = {}, onLongClick = {
+                            scope.launch {
+                                vm.c.recs.mute(tag.name)
+                                tasteVersion++
+                            }
+                        }),
+                    ) {
+                        Text(tag.name.replace('_', ' '), color = colors.of(tag.category), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                     }
                 }
-            }
-            PrimaryTabRow(selectedTabIndex = tab, modifier = Modifier.padding(top = 8.dp)) {
-                listOf(R.string.profile_likes, R.string.drawer_history, R.string.drawer_downloads).forEachIndexed { i, label ->
-                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(stringResource(label)) })
-                }
-            }
-            when (tab) {
-                0 -> if (liked.items.isEmpty()) {
-                    EmptyState(rememberKaomoji(listOf("(´･ω･`)") + Kaomoji.BORED), stringResource(R.string.likes_empty), null)
-                } else {
-                    FeedList(likedFeed, actions, grid = true)
-                }
-                1 -> HistoryPosts(historyFeed, actions)
-                else -> DownloadsList(vm, downloads)
             }
         }
     }
@@ -468,17 +520,17 @@ fun DownloadsScreen(vm: MainViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun DownloadsList(vm: MainViewModel, downloads: List<DownloadEntity>) {
+private fun DownloadsList(vm: MainViewModel, downloads: List<DownloadEntity>, header: (@Composable () -> Unit)? = null) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    if (downloads.isEmpty()) {
-        EmptyState(rememberKaomoji(listOf("(・ω・)ノ") + Kaomoji.BORED), stringResource(R.string.downloads_empty), null)
-        return
-    }
     val running = downloads.filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.PAUSED }
     val failed = downloads.filter { it.status == DownloadStatus.FAILED }
     val done = downloads.filter { it.status == DownloadStatus.DONE }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        if (header != null) item(key = "header") { header() }
+        if (downloads.isEmpty()) {
+            item(key = "empty") { EmptyState(rememberKaomoji(listOf("(・ω・)ノ") + Kaomoji.BORED), stringResource(R.string.downloads_empty), null) }
+        }
         fun section(title: Int, list: List<DownloadEntity>, trailing: (@Composable () -> Unit)? = null) {
             if (list.isEmpty()) return
             item(key = "h$title") {

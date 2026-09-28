@@ -55,7 +55,13 @@ object DudeIcons {
     val Palette = stroke("Palette", "M12,3a9,9 0 1,0 0,18c1.1,0 1.8,-0.9 1.8,-1.8 0,-1.2 -1,-1.6 -1,-2.7 0,-1 0.8,-1.5 1.8,-1.5H17a4,4 0 0,0 4,-4c0,-4.4 -4,-8 -9,-8z" + circle(7.5f, 11f, 1f) + circle(10f, 7f, 1f) + circle(15f, 7.5f, 1f))
     val Refresh = stroke("Refresh", "M20,11a8,8 0 1,0 -2.3,5.7M20,5v6h-6")
 
+    /** Колокольчик с «волнами» — уведомления включены. */
+    val BellRing = stroke("BellRing", BELL + "M3,9.5a9,9 0 0,1 2.4,-5M21,9.5a9,9 0 0,0 -2.4,-5")
+    val BellOff = stroke("BellOff", BELL + "M4,4L20,20")
+
     // ---------------------------------------------------------------------------------------
+
+    private const val BELL = "M6,16v-5a6,6 0 0,1 12,0v5l1.5,2h-15zM10,20.5a2,2 0 0,0 4,0"
 
     private const val HEART = "M12,20s-7,-4.4 -7,-10a4,4 0 0,1 7,-2.6A4,4 0 0,1 19,10c0,5.6 -7,10 -7,10z"
     private const val SAVE = "M6,4h12v16l-6,-4 -6,4z"

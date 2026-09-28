@@ -49,6 +49,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -76,76 +77,97 @@ fun MainShell(vm: MainViewModel, actions: PostActions, dark: Boolean, onCloseApp
     // «Назад» сначала закрывает меню.
     androidx.activity.compose.BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
 
+    // Меню открыли — заранее готовим «Случайный пост».
+    LaunchedEffect(drawer.targetValue) { if (drawer.targetValue == DrawerValue.Open) vm.warmRandom() }
+
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
             DudeDrawer(
                 vm = vm,
                 dark = dark,
-                onNavigate = { route ->
-                    scope.launch { drawer.close() }
-                    vm.navigate(route)
-                },
+                // Меню не закрываем анимацией: экран с ним и так уходит под новый, а два движения сразу
+                // (меню уезжает, экраны меняются) выглядели как рывок. Вернёмся — меню уже закрыто.
+                onNavigate = { route -> vm.navigate(route) },
                 onCloseApp = onCloseApp,
             )
         },
     ) {
         val site = folders.firstOrNull { it.id == selectedId }
-        val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-        // Фон ленты из темы: цвет, градиент или картинка под прозрачной лентой.
-        val backdrop = app.dudebooru.ui.theme.LocalAppTheme.current.background
-        val withBackdrop = backdrop.kind != app.dudebooru.ui.theme.ThemeBackground.Kind.NONE
-        if (withBackdrop) app.dudebooru.ui.theme.ThemeBackdrop(backdrop, Modifier.fillMaxSize())
-        Scaffold(
-            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-            containerColor = if (withBackdrop) Color.Transparent else MaterialTheme.colorScheme.background,
-            topBar = {
-                CenterAlignedTopAppBar(
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawer.open() } }) {
-                            Icon(DudeIcons.Menu, contentDescription = stringResource(R.string.menu))
-                        }
-                    },
-                    // Только подпись: тап ничего не делает.
-                    title = { Text(site?.name ?: stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) },
-                    actions = {
-                        if (site != null) {
-                            SortButton(vm.folderFeed(site.id))
-                            IconButton(onClick = { vm.navigate(Route.Search(site.id)) }) {
-                                Icon(DudeIcons.Search, contentDescription = stringResource(R.string.search))
-                            }
-                        }
-                    },
-                    scrollBehavior = scrollBehavior,
-                    colors = if (withBackdrop) {
-                        TopAppBarDefaults.centerAlignedTopAppBarColors(
-                            containerColor = Color.Transparent,
-                            scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
-                        )
-                    } else {
-                        TopAppBarDefaults.centerAlignedTopAppBarColors()
-                    },
-                )
-            },
-        ) { padding ->
-            if (folders.isEmpty() || site == null) return@Scaffold
-            androidx.compose.foundation.layout.Column(Modifier.padding(padding).fillMaxSize()) {
-                val counts by vm.newCounts().collectAsStateWithLifecycle()
-                FolderChips(
-                    folders = folders,
-                    selectedId = site.id,
-                    counts = counts,
-                    onSelect = vm::select,
-                    onMarkSeen = vm::markAllSeen,
-                    onHide = vm::hideFolder,
-                    onMove = vm::moveFolder,
-                    stateOf = { vm.folderFeed(it).state },
-                )
-                Box(Modifier.fillMaxSize()) {
-                    FolderPager(vm, folders, site, actions)
-                    // Пейджер на первой папке забирает жест растяжением — у края ловим его сами.
-                    EdgeSwipe(onOpen = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.CenterStart))
-                }
+        // Папки ещё читаются из настроек — доли секунды при запуске.
+        if (site == null) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
+        } else {
+            MainFolders(vm, folders, site, actions, onOpenDrawer = { scope.launch { drawer.open() } })
+        }
+    }
+}
+
+@Composable
+private fun MainFolders(vm: MainViewModel, folders: List<SiteConfig>, site: SiteConfig, actions: PostActions, onOpenDrawer: () -> Unit) {
+    // Пейджер создаётся, когда папки уже известны: сразу на выбранной, без пролистывания при запуске.
+    val pager = rememberPagerState(initialPage = folders.indexOfFirst { it.id == site.id }.coerceAtLeast(0)) { folders.size }
+    // Шапка, папка и сортировка меняются вместе со свайпом, а не когда пейджер остановится.
+    val shown = folders.getOrNull(pager.currentPage) ?: site
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    // Фон ленты из темы: цвет, градиент или картинка под прозрачной лентой.
+    val backdrop = app.dudebooru.ui.theme.LocalAppTheme.current.background
+    val withBackdrop = backdrop.kind != app.dudebooru.ui.theme.ThemeBackground.Kind.NONE
+    if (withBackdrop) app.dudebooru.ui.theme.ThemeBackdrop(backdrop, Modifier.fillMaxSize())
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = if (withBackdrop) Color.Transparent else MaterialTheme.colorScheme.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(DudeIcons.Menu, contentDescription = stringResource(R.string.menu))
+                    }
+                },
+                // Только подпись: тап ничего не делает. На полпути свайпа гаснет и сменяется следующей.
+                title = {
+                    Text(
+                        shown.name,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.graphicsLayer {
+                            alpha = 1f - 2f * kotlin.math.abs(pager.currentPageOffsetFraction).coerceIn(0f, 0.5f)
+                        },
+                    )
+                },
+                actions = {
+                    SortButton(vm.folderFeed(shown.id))
+                    IconButton(onClick = { vm.navigate(Route.Search(shown.id)) }) {
+                        Icon(DudeIcons.Search, contentDescription = stringResource(R.string.search))
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+                colors = if (withBackdrop) {
+                    TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
+                    )
+                } else {
+                    TopAppBarDefaults.centerAlignedTopAppBarColors()
+                },
+            )
+        },
+    ) { padding ->
+        androidx.compose.foundation.layout.Column(Modifier.padding(padding).fillMaxSize()) {
+            val counts by vm.newCounts().collectAsStateWithLifecycle()
+            FolderChips(
+                folders = folders,
+                selectedId = shown.id,
+                counts = counts,
+                onSelect = vm::select,
+                onMarkSeen = vm::markAllSeen,
+                onHide = vm::hideFolder,
+                onMove = vm::moveFolder,
+                stateOf = { vm.folderFeed(it).state },
+            )
+            Box(Modifier.fillMaxSize()) {
+                FolderPager(vm, folders, site, actions, pager)
+                // Пейджер на первой папке забирает жест растяжением — у края ловим его сами.
+                EdgeSwipe(onOpen = onOpenDrawer, modifier = Modifier.align(Alignment.CenterStart))
             }
         }
     }
@@ -153,9 +175,14 @@ fun MainShell(vm: MainViewModel, actions: PostActions, dark: Boolean, onCloseApp
 
 /** Источники параллельны: у каждого своя лента; переключение свайпом, как папки в Telegram. */
 @Composable
-private fun FolderPager(vm: MainViewModel, folders: List<SiteConfig>, site: SiteConfig, actions: PostActions) {
+private fun FolderPager(
+    vm: MainViewModel,
+    folders: List<SiteConfig>,
+    site: SiteConfig,
+    actions: PostActions,
+    pager: androidx.compose.foundation.pager.PagerState,
+) {
     val index = folders.indexOfFirst { it.id == site.id }.coerceAtLeast(0)
-    val pager = rememberPagerState(initialPage = index) { folders.size }
 
     // Тап по папке → листаем пейджер; свайп пейджера → выбираем папку.
     LaunchedEffect(index) { if (pager.currentPage != index) pager.animateScrollToPage(index) }

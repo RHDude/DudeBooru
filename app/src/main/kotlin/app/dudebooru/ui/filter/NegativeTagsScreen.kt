@@ -232,7 +232,7 @@ fun HiddenSheetContent(hidden: Map<String, Int>, onRestore: (String) -> Unit) {
                     Text(expression, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                 }
                 Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.hidden_count, count), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                Text(androidx.compose.ui.res.pluralStringResource(R.plurals.hidden_posts, count, count), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = { onRestore(expression) }) { Text(stringResource(R.string.hidden_restore)) }
             }
         }
