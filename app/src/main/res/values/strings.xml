@@ -192,7 +192,7 @@
     <string name="settings_feed_grid">Grid</string>
     <string name="settings_double_tap">Double tap to like</string>
     <string name="settings_animate_gifs">Animate GIFs in the feed</string>
-    <string name="plan_legend">Solid frame — sent to the server, dashed — checked in the app (tag limit)</string>
+    <string name="plan_legend">The site limits tags per search, and the sort uses up a slot too. Solid frame — sent to the site, dashed — checked in the app: same result, it just loads a bit longer. Signing in raises the limit</string>
 
     <!-- Folders -->
     <string name="folder_mark_seen">Mark all as seen</string>
@@ -534,7 +534,7 @@
 • Accounts: sign-in status in one line, the sign-in form expands on tap
 • About: error log, licenses, links to the sites
 • The feed header no longer turns lighter while scrolling
-• Two-tag search without an account: both tags go to the site, the sort gives way
+• Tag search without an account: the sort always works, extra tags are checked in the app, the feed loads in larger pages
 • Random post on Danbooru no longer fails with error 500</string>
     <!-- Settings: sources, viewer, privacy, data, about -->
     <string name="settings_profile_edit">Edit profile</string>

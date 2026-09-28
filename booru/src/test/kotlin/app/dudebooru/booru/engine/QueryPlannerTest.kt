@@ -50,32 +50,32 @@ class QueryPlannerTest {
             orderTerm = "order:score",
             limit = 2,
         )
-        assertTrue(plan.serverTerms.containsAll(listOf("score:>100", "width:>=1920")))
-        assertEquals(2, plan.serverTerms.count { it in setOf("a", "b", "c") })
-        assertEquals(1, plan.localTerms.size)
+        assertTrue(plan.serverTerms.containsAll(listOf("score:>100", "width:>=1920", "order:score")))
+        assertEquals(1, plan.serverTerms.count { it in setOf("a", "b", "c") })
+        assertEquals(2, plan.localTerms.size)
     }
 
     @Test
-    fun `two tags on a free account beat the sort`() {
+    fun `on a free account the sort stays, the rarest tag goes to the server, the other is checked locally`() {
         val plan = QueryPlanner.plan(
             siteId = "danbooru",
             rules = dan,
-            userTerms = listOf("hatsune_miku", "twintails"),
+            userTerms = listOf("twintails", "hatsune_miku"),
             systemTerms = listOf("rating:g,s"),
             orderTerm = "order:rank",
             limit = 2,
+            postCounts = mapOf("twintails" to 1_200_000L, "hatsune_miku" to 146_000L),
         )
-        assertEquals(listOf("rating:g,s", "hatsune_miku", "twintails"), plan.serverTerms)
-        assertTrue(plan.localTerms.isEmpty())
-        assertTrue(plan.sortDropped)
+        assertEquals(listOf("rating:g,s", "order:rank", "hatsune_miku"), plan.serverTerms)
+        assertEquals(listOf("twintails"), plan.localTerms)
+        assertFalse(plan.sortDropped)
     }
 
     @Test
-    fun `sort takes the slot a negative tag would have taken`() {
-        val plan = QueryPlanner.plan("danbooru", dan, listOf("hatsune_miku", "-comic"), emptyList(), "order:rank", limit = 2)
-        assertEquals(listOf("order:rank", "hatsune_miku"), plan.serverTerms)
-        assertEquals(listOf("-comic"), plan.localTerms)
-        assertFalse(plan.sortDropped)
+    fun `without a sort both tags go to the server`() {
+        val plan = QueryPlanner.plan("danbooru", dan, listOf("hatsune_miku", "twintails"), listOf("rating:g,s"), null, limit = 2)
+        assertTrue(plan.serverTerms.containsAll(listOf("hatsune_miku", "twintails")))
+        assertTrue(plan.localTerms.isEmpty())
     }
 
     @Test

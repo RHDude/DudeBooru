@@ -93,7 +93,9 @@ class MoebooruEngine(
             postCounts = countsIfNeeded(userTerms, session),
             moebooruLimits = true,
         )
-        val url = postsUrl(request.mode, plan.query, pageSize, number)
+        // Часть тегов проверяется у себя — страница крупнее, чтобы после фильтра экран был полон.
+        val requestSize = if (plan.localTerms.isNotEmpty()) site.maxPageSize else pageSize
+        val url = postsUrl(request.mode, plan.query, requestSize, number)
         val response = decode(http.get(site, get(url), session.background), MoebooruPostsV2Dto.serializer())
         val categories = resolveCategories(response)
         val pools = response.poolPosts.groupBy({ it.postId }, { it.poolId })

@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -97,19 +98,21 @@ class DanbooruEngineTest {
             ),
         )
         server.enqueue(TestSupport.json(TestSupport.fixture("danbooru_posts.json")))
-        // Лимит 2: оба тега важнее сортировки и уходят на сервер, сортировка не влезает,
-        // исключение проверяется локально.
+        // Лимит 2: сортировка занимает слот, на сервер уходит самый редкий тег, второй проверяется
+        // локально — и страница берётся крупнее, чтобы экран заполнился.
         val page = engine.posts(
-            FeedRequest(tags = listOf("headphones", "ikari_shinji", "-comic"), sort = SortOrder.BEST, mode = ContentMode.ALL),
+            FeedRequest(tags = listOf("headphones", "ikari_shinji"), sort = SortOrder.BEST, mode = ContentMode.ALL),
             null,
             20,
         )
         assertEquals("/tags.json", server.takeRequest().url.encodedPath)
-        assertEquals("ikari_shinji headphones", server.takeRequest().url.queryParameter("tags"))
-        assertEquals(listOf("-comic"), page.plan.localTerms)
-        assertTrue(page.plan.sortDropped)
+        val request = server.takeRequest()
+        assertEquals("order:score ikari_shinji", request.url.queryParameter("tags"))
+        assertEquals("100", request.url.queryParameter("limit"))
+        assertEquals(listOf("headphones"), page.plan.localTerms)
+        assertFalse(page.plan.sortDropped)
         assertTrue(page.posts.isNotEmpty())
-        assertTrue(page.posts.none { "comic" in it.allTags })
+        assertTrue(page.posts.all { it.allTags.containsAll(listOf("headphones", "ikari_shinji")) })
     }
 
     @Test
