@@ -163,7 +163,8 @@ private fun MainFolders(vm: MainViewModel, folders: List<SiteConfig>, site: Site
             )
         },
     ) { padding ->
-        androidx.compose.foundation.layout.Column(Modifier.padding(padding).fillMaxSize()) {
+        // Свайп вправо, который уже некуда отдать ни ленте, ни ряду папок, открывает меню.
+        androidx.compose.foundation.layout.Column(Modifier.padding(padding).fillMaxSize().nestedScroll(rememberDrawerPull(onOpenDrawer))) {
             val counts by vm.newCounts().collectAsStateWithLifecycle()
             val folderPrefs by vm.folderPrefs.collectAsStateWithLifecycle()
             FolderTabs(
@@ -176,7 +177,7 @@ private fun MainFolders(vm: MainViewModel, folders: List<SiteConfig>, site: Site
                 onMove = vm::moveFolder,
                 stateOf = { vm.folderFeed(it).state },
             )
-            Box(Modifier.fillMaxSize().nestedScroll(rememberDrawerPull(onOpenDrawer))) {
+            Box(Modifier.fillMaxSize()) {
                 FolderPager(vm, folders, site, actions, pager, swipe = folderPrefs.swipe)
                 // На остальных папках свайп вправо листает к предыдущей — меню открывается от края.
                 EdgeSwipe(onOpen = onOpenDrawer, modifier = Modifier.align(Alignment.CenterStart))
@@ -269,7 +270,8 @@ private fun FolderTabs(
                 }
             },
             modifier = Modifier
-                .horizontalScroll(scroll)
+                // Всё помещается — ряд не прокручивается: ни свечения у края, ни перехвата свайпа у меню.
+                .horizontalScroll(scroll, enabled = scroll.maxValue > 0)
                 .drawBehind {
                     val n = bounds.lefts.size
                     if (n == 0) return@drawBehind
@@ -408,10 +410,13 @@ private fun rememberDrawerPull(onOpen: () -> Unit): NestedScrollConnection {
 
             // Короткий быстрый рывок тоже открывает: как у самого меню.
             override suspend fun onPreFling(available: Velocity): Velocity {
+                val pulling = pulled > 0f
                 if (!opened && pulled > flingDistance && available.x > flingVelocity) open()
                 pulled = 0f
                 opened = false
-                return Velocity.Zero
+                // Жест ушёл в меню — скорость забираем, иначе лента дорисует у левого края
+                // свечение или растяжение (на части прошивок — белую полосу на секунду).
+                return if (pulling && available.x > 0f) Velocity(available.x, 0f) else Velocity.Zero
             }
         }
     }
