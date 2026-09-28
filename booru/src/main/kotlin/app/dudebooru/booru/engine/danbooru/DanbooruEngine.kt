@@ -259,6 +259,16 @@ class DanbooruEngine(
         return PostsPage(raw.map { it.toPost() }.filter { it.isViewable }, raw.size, if (raw.isEmpty()) null else PageKey.Number(number + 1), QueryPlan.EMPTY)
     }
 
+    override suspend fun recommendedForUser(limit: Int, session: Session): List<Post> {
+        val login = session.credentials?.login ?: return emptyList()
+        val url = base.newBuilder()
+            .addPathSegments("recommended_posts.json")
+            .addQueryParameter("search[user_name]", login)
+            .addQueryParameter("limit", limit.toString())
+            .build()
+        return getList(url, session, ListSerializer(DanbooruPostDto.serializer())).map { it.toPost() }.filter { it.isViewable }
+    }
+
     /** Повторная отправка того же состояния («уже в избранном», «голоса нет») — не ошибка. */
     private suspend fun tolerate(vararg codes: Int, block: suspend () -> Unit) {
         try {

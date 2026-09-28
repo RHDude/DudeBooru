@@ -288,6 +288,13 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         prefs[DOH]?.let { runCatching { DohProvider.valueOf(it) }.getOrNull() } ?: DohProvider.NONE
     }
 
+    /** Сколько было лайков, когда рекомендации открывали в последний раз — для метки «new». */
+    val recsSeenLikes: Flow<Int> = store.data.map { it[RECS_SEEN] ?: 0 }
+
+    suspend fun setRecsSeenLikes(value: Int) {
+        store.edit { it[RECS_SEEN] = value }
+    }
+
     suspend fun setDoh(provider: DohProvider) {
         store.edit { it[DOH] = provider.name }
     }
@@ -324,6 +331,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val MIRROR_LIKES = androidx.datastore.preferences.core.booleanPreferencesKey("mirror_likes")
         val KEEP_HISTORY = androidx.datastore.preferences.core.booleanPreferencesKey("keep_history")
         val DOH = stringPreferencesKey("doh")
+        val RECS_SEEN = androidx.datastore.preferences.core.intPreferencesKey("recs_seen_likes")
 
         const val DEFAULT_NAME = "Чувак"
         const val DEFAULT_NICK = "dude"

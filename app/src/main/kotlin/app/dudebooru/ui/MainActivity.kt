@@ -191,6 +191,11 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                 Route.History -> HistoryScreen(vm, actions, onBack = { vm.back() })
                 Route.Artists -> ArtistsScreen(vm, onBack = { vm.back() })
                 Route.Downloads -> DownloadsScreen(vm, onBack = { vm.back() })
+                Route.Recs -> app.dudebooru.ui.rec.RecsScreen(vm, actions, onBack = { vm.back() })
+                is Route.Similar -> {
+                    val controller = vm.controller(route.controllerId) ?: return@Surface
+                    app.dudebooru.ui.rec.SimilarScreen(vm, controller, route.post, actions, onBack = { vm.back() })
+                }
             }
             NotInterestedSheet(actions)
             AdultDialog(vm)

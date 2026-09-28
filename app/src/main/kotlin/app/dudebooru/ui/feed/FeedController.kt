@@ -31,8 +31,12 @@ data class FeedKey(
     val tags: List<String>,
 )
 
-/** Карточка ленты: один пост или карусель из серии. */
-data class FeedItem(val posts: List<Post>) {
+/** Карточка ленты: один пост или карусель из серии; у рекомендаций — причина «почему». */
+data class FeedItem(
+    val posts: List<Post>,
+    val reasons: List<String> = emptyList(),
+    val explore: Boolean = false,
+) {
     val lead: Post get() = posts.first()
     val key: String get() = lead.key
 }
@@ -49,6 +53,8 @@ data class FeedState(
     val authDropped: Boolean = false,
     /** Скрыто негативными тегами: строка → сколько постов («скрыто 12»). */
     val hidden: Map<String, Int> = emptyMap(),
+    /** Номер страницы для лент со своим источником. */
+    val page: Int = 0,
 ) {
     val hiddenCount: Int get() = hidden.values.sum()
 }
@@ -68,6 +74,8 @@ class FeedController(
     private val onSortChanged: (SortOrder) -> Unit = {},
     /** Лента из базы («Сохранённые», лайки, история): без сети и без догрузки семей. */
     private val localSource: kotlinx.coroutines.flow.Flow<List<Post>>? = null,
+    /** Свой источник: рекомендации, «похожие». */
+    private val customSource: CustomSource? = null,
 ) {
     private val _state = MutableStateFlow(FeedState())
     val state: StateFlow<FeedState> = _state.asStateFlow()
@@ -138,6 +146,31 @@ class FeedController(
             }
         } else {
             _state.update { it.copy(loading = true, error = null) }
+        }
+        if (customSource != null) {
+            job = scope.launch {
+                try {
+                    val current = _state.value
+                    val page = if (reset) 1 else current.page + 1
+                    val shown = if (reset) emptySet() else current.items.flatMapTo(HashSet()) { item -> item.posts.map { it.key } }
+                    val chunk = withContext(Dispatchers.IO) { customSource.load(page, shown) }
+                    _state.update {
+                        it.copy(
+                            items = if (reset) chunk.items else it.items + chunk.items,
+                            page = page,
+                            endReached = !chunk.hasMore,
+                            loading = false,
+                            refreshing = false,
+                            error = null,
+                        )
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _state.update { it.copy(loading = false, refreshing = false, error = e) }
+                }
+            }
+            return
         }
         job = scope.launch {
             try {
@@ -229,3 +262,10 @@ class FeedController(
         }
     }
 }
+
+/** Источник ленты вне обычного поиска: страница → карточки. */
+fun interface CustomSource {
+    suspend fun load(page: Int, shown: Set<String>): CustomChunk
+}
+
+data class CustomChunk(val items: List<FeedItem>, val hasMore: Boolean)

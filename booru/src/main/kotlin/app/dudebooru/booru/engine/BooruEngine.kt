@@ -101,6 +101,12 @@ interface BooruEngine {
      */
     suspend fun pushCollectionState(postId: Long, like: Boolean?, save: Boolean?, session: Session)
 
+    /**
+     * Рекомендации самого сайта для аккаунта (Danbooru строит их по избранному при 50+ постах).
+     * Используются как дополнительный источник кандидатов; у Moebooru таких нет.
+     */
+    suspend fun recommendedForUser(limit: Int, session: Session): List<Post> = emptyList()
+
     /** Избранное аккаунта на сайте — для импорта в «Сохранённые» при первом входе. */
     suspend fun favorites(page: PageKey?, limit: Int, session: Session): PostsPage
 

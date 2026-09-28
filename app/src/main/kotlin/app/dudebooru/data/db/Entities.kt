@@ -156,3 +156,18 @@ data class DownloadEntity(
     val createdAt: Long,
     val updatedAt: Long,
 )
+
+/** «Не интересно…» — минус-сигнал для рекомендаций. */
+@Entity(tableName = "dislikes", primaryKeys = ["site", "postId"])
+data class DislikeEntity(
+    val site: String,
+    val postId: Long,
+    val at: Long,
+)
+
+/** Тег, который человек убрал из «Моих тегов»: не учитывается во вкусе. */
+@Entity(tableName = "muted_taste")
+data class MutedTagEntity(
+    @PrimaryKey val tag: String,
+    val at: Long,
+)

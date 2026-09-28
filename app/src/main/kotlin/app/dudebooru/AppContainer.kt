@@ -15,6 +15,7 @@ import app.dudebooru.data.net.DynamicProxySelector
 import app.dudebooru.data.posts.ArtistAvatars
 import app.dudebooru.data.posts.Downloader
 import app.dudebooru.data.posts.PostRepository
+import app.dudebooru.data.rec.RecommendationRepository
 import app.dudebooru.data.secure.SecretStore
 import app.dudebooru.data.settings.SettingsRepository
 import app.dudebooru.data.settings.settingsStore
@@ -78,6 +79,8 @@ class AppContainer(app: Application) {
     val collections = CollectionsRepository(app, db, registry, accounts, settings)
 
     val downloads = DownloadRepository(app, db, settings)
+
+    val recs = RecommendationRepository(db, registry, accounts, negative, tags)
 
     val subscriptions = SubscriptionRepository(db.subscriptions(), registry, accounts, settings, negative)
 

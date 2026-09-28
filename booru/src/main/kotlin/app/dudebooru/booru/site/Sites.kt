@@ -11,6 +11,7 @@ object Sites {
         anonymousTagLimit = 2,
         requestsPerSecond = 1.0,
         burst = 6,
+        approxTotalPosts = 9_500_000,
     )
 
     val SAFEBOORU = SiteConfig(
@@ -24,6 +25,7 @@ object Sites {
         anonymousTagLimit = 2,
         requestsPerSecond = 1.0,
         burst = 6,
+        approxTotalPosts = 9_500_000,
     )
 
     val YANDERE = SiteConfig(
@@ -36,6 +38,7 @@ object Sites {
         anonymousTagLimit = 6,
         requestsPerSecond = 1.0,
         burst = 4,
+        approxTotalPosts = 1_270_000,
     )
 
     val KONACHAN = SiteConfig(
@@ -49,6 +52,7 @@ object Sites {
         anonymousTagLimit = 6,
         requestsPerSecond = 1.0,
         burst = 4,
+        approxTotalPosts = 410_000,
     )
 
     val SAKUGABOORU = SiteConfig(

@@ -22,7 +22,9 @@ import app.dudebooru.data.settings.CensorPrefs
 import app.dudebooru.data.settings.FeedPrefs
 import app.dudebooru.data.settings.Profile
 import app.dudebooru.data.settings.ThemeMode
+import app.dudebooru.ui.feed.CustomChunk
 import app.dudebooru.ui.feed.FeedController
+import app.dudebooru.ui.feed.FeedItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -333,6 +335,52 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
     fun recordView(post: Post) {
         if (!keepHistory.value) return
         viewModelScope.launch { c.db.history().upsert(ViewHistoryEntity(post.site, post.id, System.currentTimeMillis())) }
+    }
+
+    // --- шаг «рекомендации» ------------------------------------------------------------------
+
+    /** Метка «new» у «Рекомендаций»: с прошлого открытия прибавилось лайков — подборка обновилась. */
+    val recsNew: StateFlow<Boolean> = combine(likeCount, c.settings.recsSeenLikes) { likes, seen ->
+        likes >= c.recs.coldStartLikes && likes - seen >= 3
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun markRecsSeen() {
+        viewModelScope.launch { c.settings.setRecsSeenLikes(likeCount.value) }
+    }
+
+    fun recsFeed(siteId: String): FeedController = controllers.getOrPut("recs:$siteId") {
+        val site = requireNotNull(c.registry.site(siteId))
+        FeedController(
+            "recs:$siteId", site, c, viewModelScope, emptyList(), SortOrder.NEW, { mode.value },
+            customSource = { page, shown ->
+                val recs = c.recs.page(site, mode.value, page, shown)
+                CustomChunk(recs.map { FeedItem(listOf(it.post), it.reasons, it.explore) }, hasMore = recs.isNotEmpty() && page < 10)
+            },
+        )
+    }
+
+    /** Холодный старт: популярное за неделю. */
+    fun coldStartFeed(siteId: String): FeedController = controllers.getOrPut("recs-cold:$siteId") {
+        FeedController("recs-cold:$siteId", requireNotNull(c.registry.site(siteId)), c, viewModelScope, emptyList(), SortOrder.POPULAR_WEEK, { mode.value })
+    }
+
+    fun openSimilar(post: Post) {
+        val id = "similar:${post.key}"
+        val controller = controllers.getOrPut(id) {
+            FeedController(
+                id, requireNotNull(c.registry.site(post.site)), c, viewModelScope, emptyList(), SortOrder.BEST, { mode.value },
+                customSource = { page, shown ->
+                    val recs = c.recs.similar(post, mode.value, page, shown)
+                    CustomChunk(recs.map { FeedItem(listOf(it.post), it.reasons) }, hasMore = recs.isNotEmpty() && page < 5)
+                },
+            )
+        }
+        controller.ensureLoaded()
+        navigate(Route.Similar(id, post))
+    }
+
+    fun dislike(post: Post) {
+        viewModelScope.launch { c.recs.dislike(post) }
     }
 
     /** Лента из базы: «Сохранённые», лайки, история. */

@@ -274,14 +274,29 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
                 Stat(saved, R.string.profile_saved)
                 Stat(downloads.count { it.status == DownloadStatus.DONE }, R.string.profile_downloaded)
             }
-            val myTags = remember(liked.items) { topTags(liked.items.map { it.lead }) }
+            // «Мои теги»: что приложение считает твоим вкусом; долгое нажатие — убрать лишнее.
+            val scope = rememberCoroutineScope()
+            var tasteVersion by remember { mutableIntStateOf(0) }
+            val myTags by produceState(emptyList<app.dudebooru.booru.rec.TasteTag>(), liked.items.size, tasteVersion) {
+                value = runCatching { vm.c.recs.profile().top(limit = 20) }.getOrDefault(emptyList())
+            }
             if (myTags.isNotEmpty()) {
                 val colors = LocalTagColors.current
-                Text(stringResource(R.string.profile_my_tags), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 6.dp))
+                Text(stringResource(R.string.profile_my_tags), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 2.dp))
+                Text(stringResource(R.string.profile_my_tags_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, bottom = 6.dp))
                 FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    myTags.forEach { (tag, category) ->
-                        Surface(shape = RoundedCornerShape(8.dp), color = colors.of(category).copy(alpha = 0.12f)) {
-                            Text(tag.replace('_', ' '), color = colors.of(category), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+                    myTags.forEach { tag ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = colors.of(tag.category).copy(alpha = 0.12f),
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(onClick = {}, onLongClick = {
+                                scope.launch {
+                                    vm.c.recs.mute(tag.name)
+                                    tasteVersion++
+                                }
+                            }),
+                        ) {
+                            Text(tag.name.replace('_', ' '), color = colors.of(tag.category), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                         }
                     }
                 }
@@ -310,27 +325,6 @@ private fun Stat(value: Int, label: Int) {
         Text(value.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(stringResource(label), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-}
-
-/**
- * Что приложение считает твоим вкусом: теги лайкнутого с весами категорий (художник ×3,
- * персонаж ×2, копирайт ×1.5). Полный профиль вкуса с редкостью и затуханием — шаг «рекомендации».
- */
-private fun topTags(posts: List<Post>): List<Pair<String, TagCategory>> {
-    val weights = HashMap<Pair<String, TagCategory>, Double>()
-    for (post in posts) {
-        for (category in listOf(TagCategory.ARTIST, TagCategory.CHARACTER, TagCategory.COPYRIGHT, TagCategory.GENERAL)) {
-            val w = when (category) {
-                TagCategory.ARTIST -> 3.0
-                TagCategory.CHARACTER -> 2.0
-                TagCategory.COPYRIGHT -> 1.5
-                else -> 1.0
-            }
-            post.tags.byCategory(category).forEach { tag -> weights.merge(tag to category, w, Double::plus) }
-        }
-    }
-    val common = setOf("1girl", "solo", "highres", "absurdres", "looking_at_viewer", "simple_background", "white_background")
-    return weights.entries.filter { it.key.first !in common && it.value > 1.0 }.sortedByDescending { it.value }.take(20).map { it.key }
 }
 
 // ---------------------------------------------------------------------------------------------
