@@ -100,10 +100,12 @@ class DanbooruEngine(
             postCounts = countsIfNeeded(userTerms, tagLimit),
         )
 
+        // Часть тегов проверяется у себя — страница крупнее, чтобы после фильтра экран был полон.
+        val requestSize = if (plan.localTerms.isNotEmpty()) maxOf(pageSize, minOf(site.maxPageSize, LOCAL_FILTER_PAGE)) else pageSize
         val url = base.newBuilder()
             .addPathSegments("posts.json")
             .addQueryParameter("tags", plan.query)
-            .addQueryParameter("limit", pageSize.toString())
+            .addQueryParameter("limit", requestSize.toString())
             .apply {
                 when (page) {
                     is PageKey.Before -> addQueryParameter("page", "b${page.id}")
@@ -435,6 +437,9 @@ class DanbooruEngine(
         )
 
         private val ORDER_METATAGS = setOf("order", "ordfav", "ordvote", "ordfavgroup", "ordpool")
+
+        /** Размер страницы, когда часть тегов проверяется в приложении. */
+        private const val LOCAL_FILTER_PAGE = 100
 
         fun ratingTerm(mode: ContentMode): String? = when (mode) {
             ContentMode.SFW -> "rating:g,s"

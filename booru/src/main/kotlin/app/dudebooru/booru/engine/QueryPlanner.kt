@@ -92,8 +92,20 @@ object QueryPlanner {
                 local += term
             }
         }
-        // Свои теги важнее сортировки: тег, проверяемый у себя, листает ленту страницами вхолостую,
-        // а без сортировки лента просто идёт новыми сверху. Редкие теги сужают выдачу сильнее всего.
+        // Сортировка — основа ленты («Горячее», «Лучшее»…), её не выкидываем: на сервер уходит она
+        // и самые редкие теги, остальные теги проверяются в приложении. Порядок у себя не восстановить,
+        // а лишний тег — можно, пусть и ценой пары лишних страниц.
+        var sortDropped = false
+        val order = effectiveOrder?.let {
+            if (used < limit) {
+                used++
+                it
+            } else {
+                sortDropped = true
+                null
+            }
+        }
+        // Редкие теги сужают выдачу сильнее всего.
         positives.sortedWith(compareBy<String> { it.contains('*') }.thenBy { postCounts[it] ?: Long.MAX_VALUE / 2 })
             .forEach(::claim)
         // Группа «или» уходит целиком или целиком проверяется локально.
@@ -103,16 +115,6 @@ object QueryPlanner {
                 used += orGroup.size
             } else {
                 local += orGroup
-            }
-        }
-        var sortDropped = false
-        val order = effectiveOrder?.let {
-            if (used < limit) {
-                used++
-                it
-            } else {
-                sortDropped = true
-                null
             }
         }
         // Исключения дешевле всего проверить у себя — они последние в очереди за слотами.
