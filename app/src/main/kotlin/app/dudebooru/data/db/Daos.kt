@@ -293,3 +293,34 @@ interface PendingDao {
     @Query("SELECT COUNT(*) FROM pending_actions")
     fun count(): Flow<Int>
 }
+
+@Dao
+interface TasteDao {
+    @Query(
+        """
+        SELECT p.json AS json, l.likedAt AS at, 'LIKE' AS kind FROM likes l JOIN posts p ON p.site = l.site AND p.id = l.postId
+        UNION ALL
+        SELECT p.json AS json, s.savedAt AS at, 'SAVE' AS kind FROM saved s JOIN posts p ON p.site = s.site AND p.id = s.postId
+        UNION ALL
+        SELECT p.json AS json, d.at AS at, 'DISLIKE' AS kind FROM dislikes d JOIN posts p ON p.site = d.site AND p.id = d.postId
+        """,
+    )
+    suspend fun signals(): List<SignalRow>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun dislike(entry: DislikeEntity)
+
+    @Query("SELECT tag FROM muted_taste")
+    suspend fun muted(): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun mute(entry: MutedTagEntity)
+
+    @Query("SELECT site || ':' || postId FROM view_history")
+    suspend fun seenKeys(): List<String>
+
+    @Query("SELECT site || ':' || postId FROM likes UNION SELECT site || ':' || postId FROM saved UNION SELECT site || ':' || postId FROM dislikes")
+    suspend fun collectedKeys(): List<String>
+}
+
+data class SignalRow(val json: String, val at: Long, val kind: String)

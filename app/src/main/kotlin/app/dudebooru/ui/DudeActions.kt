@@ -112,14 +112,16 @@ class DudeActions(
      * Похожие по тегам: персонаж и копирайт поста. Движок рекомендаций и поиск той же картинки
      * на других источниках по md5 — шаг «рекомендации».
      */
-    override fun findSimilar(post: Post) {
-        val tags = (post.tags.character.take(1) + post.tags.copyright.take(1)).ifEmpty { post.tags.general.take(2) }
-        if (tags.isNotEmpty()) vm.openSearchResults(post.site, tags)
-    }
+    /** Похожие по тегам (движок рекомендаций) и та же картинка на других источниках по md5. */
+    override fun findSimilar(post: Post) = vm.openSimilar(post)
 
+    /** Замена дизлайку: минус-сигнал для рекомендаций и лист с тегами поста. */
     override fun notInterested(post: Post) {
+        vm.dislike(post)
         notInterestedPost.value = post
     }
+
+    override fun searchTags(site: String, tags: List<String>) = vm.openSearchResults(site, tags)
 
     override fun makeAvatar(post: Post) {
         scope.launch {

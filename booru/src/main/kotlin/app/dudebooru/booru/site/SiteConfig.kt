@@ -33,6 +33,8 @@ data class SiteConfig(
     val requestsPerSecond: Double = 1.0,
     val burst: Int = 5,
     val isCustom: Boolean = false,
+    /** Примерно постов на сайте — для редкости тегов (IDF) в рекомендациях. */
+    val approxTotalPosts: Long = 1_000_000,
 ) {
     fun baseUrlFor(mode: ContentMode): String =
         if (mode == ContentMode.SFW && safeBaseUrl != null) safeBaseUrl else baseUrl

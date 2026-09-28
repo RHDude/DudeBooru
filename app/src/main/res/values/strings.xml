@@ -137,6 +137,13 @@
     <string name="dl_wifi_only">Только по Wi-Fi</string>
     <string name="dl_write_tags">Записывать теги в файл (XMP)</string>
     <string name="dl_parallel">Одновременных загрузок: %1$d</string>
+    <string name="recs_cold">Лайкните ещё %1$d артов, и подборка станет вашей. Пока — популярное за неделю</string>
+    <string name="recs_reason">вы лайкали %1$s</string>
+    <string name="recs_reason_two">вы лайкали %1$s и %2$s</string>
+    <string name="recs_explore">на пробу — вне вашего вкуса</string>
+    <string name="similar_title">Похожие</string>
+    <string name="similar_same_image">Эта же картинка на других сайтах:</string>
+    <string name="profile_my_tags_hint">Долгое нажатие — убрать тег из вкуса</string>
     <string name="feed_new_button">↑ %1$d новых</string>
     <string name="feed_new_divider">Новое с прошлого визита</string>
     <string name="settings_feed">Лента</string>

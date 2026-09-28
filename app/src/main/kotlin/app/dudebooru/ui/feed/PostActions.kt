@@ -27,6 +27,9 @@ interface PostActions {
     fun searchTag(post: Post, tag: String, add: Boolean)
     fun hideTag(post: Post, tag: String)
 
+    /** Причина рекомендации — открыть эти теги. */
+    fun searchTags(site: String, tags: List<String>)
+
     /** Вернуть негативный тег (из «скрыто N»). */
     fun restoreTag(expression: String)
 

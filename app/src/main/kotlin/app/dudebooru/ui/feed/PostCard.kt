@@ -106,6 +106,9 @@ fun PostCard(item: FeedItem, controller: FeedController, actions: PostActions, m
             PostMenuButton(current, item.posts, actions)
         }
 
+        if (item.reasons.isNotEmpty() || item.explore) {
+            ReasonLine(item, actions)
+        }
         PostMedia(
             item = item,
             onPage = { page = it },
@@ -321,4 +324,27 @@ fun placeholderColor(post: Post): Color {
     val seed = post.md5?.take(6)?.toIntOrNull(16) ?: post.id.toInt()
     val shade = 0x60 + Math.floorMod(seed, 0x30)
     return Color(shade, shade, shade + 10, 0x55)
+}
+
+/** «вы лайкали hatsune_miku и artist_x» — тап открывает эти теги; «на пробу» — пост вне вкуса. */
+@Composable
+private fun ReasonLine(item: FeedItem, actions: PostActions) {
+    val text = when {
+        item.explore -> stringResource(R.string.recs_explore)
+        item.reasons.size >= 2 -> stringResource(R.string.recs_reason_two, item.reasons[0], item.reasons[1])
+        else -> stringResource(R.string.recs_reason, item.reasons[0])
+    }
+    Row(
+        Modifier
+            .padding(start = 12.dp, end = 12.dp, bottom = 6.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = item.reasons.isNotEmpty()) { actions.searchTags(item.lead.site, item.reasons) }
+            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(DudeIcons.Spark, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
 }

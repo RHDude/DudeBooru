@@ -1,6 +1,7 @@
 package app.dudebooru.data.db
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -22,9 +23,13 @@ import androidx.room.RoomDatabase
         SavedFolderEntity::class,
         SavedFolderPostEntity::class,
         DownloadEntity::class,
+        DislikeEntity::class,
+        MutedTagEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
+    // С версии 3 — только миграции: обновление не должно стирать лайки и сохранённые.
+    autoMigrations = [AutoMigration(from = 3, to = 4)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun posts(): PostDao
@@ -38,12 +43,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun saved(): SavedDao
     abstract fun downloads(): DownloadDao
     abstract fun pending(): PendingDao
+    abstract fun taste(): TasteDao
 
     companion object {
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "dudebooru.db")
-                // До 1.0 схема меняется от шага к шагу; с первого релиза — только миграции.
-                .fallbackToDestructiveMigration(dropAllTables = true)
+                // Совсем ранние сборки (до версии 3) пересоздаются; дальше — миграции.
+                .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2)
                 .build()
     }
 }

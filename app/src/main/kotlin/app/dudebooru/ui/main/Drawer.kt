@@ -60,6 +60,7 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     val savedCount by vm.savedCount.collectAsStateWithLifecycle()
     val artistsNew by vm.artistsWithNew.collectAsStateWithLifecycle()
+    val recsNew by vm.recsNew.collectAsStateWithLifecycle()
     val downloadProgress by vm.downloadProgress.collectAsStateWithLifecycle()
     var accountsOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -159,7 +160,9 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
             Spacer(Modifier.height(6.dp))
 
             DrawerItem(DudeIcons.User, R.string.drawer_profile) { onNavigate(Route.Profile) }
-            DrawerItem(DudeIcons.Spark, R.string.drawer_recommendations) { onNavigate(Route.Soon(R.string.drawer_recommendations, 5)) }
+            DrawerItem(DudeIcons.Spark, R.string.drawer_recommendations, badge = if (recsNew) "new" else null, highlight = true) {
+                onNavigate(Route.Recs)
+            }
             DrawerItem(DudeIcons.Save, R.string.drawer_saved, badge = savedCount.takeIf { it > 0 }?.toString()) {
                 onNavigate(Route.Saved)
             }
