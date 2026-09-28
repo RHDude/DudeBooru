@@ -541,8 +541,7 @@
     <string name="network_proxy">Прокси</string>
 
     <string name="about_whats_new">Что нового в %1$s</string>
-    <string name="whats_new">• Свайп назад: под уезжающим экраном теперь виден предыдущий, а не пустота
-• Уезжающий экран — со скруглёнными углами и тенью, как в Telegram</string>
+    <string name="whats_new">• Профиль: вкладки «Лайки», «История» и «Загрузки» переключаются без прыжков — «Мои теги» не появляются заново, шапка остаётся на месте</string>
     <!-- Настройки: источники, просмотр, приватность, данные, о приложении -->
     <string name="settings_profile_edit">Изменить профиль</string>
     <string name="settings_value_relogin">Войти заново</string>

@@ -530,8 +530,7 @@
     <string name="network_proxy">Proxy</string>
 
     <string name="about_whats_new">What is new in %1$s</string>
-    <string name="whats_new">• Swipe back: the previous screen now shows underneath instead of an empty background
-• The screen you drag away gets rounded corners and a shadow, like in Telegram</string>
+    <string name="whats_new">• Profile: the Likes, History and Downloads tabs switch without jumps — “My tags” no longer reappear and the header stays in place</string>
     <!-- Settings: sources, viewer, privacy, data, about -->
     <string name="settings_profile_edit">Edit profile</string>
     <string name="settings_value_relogin">Sign in again</string>

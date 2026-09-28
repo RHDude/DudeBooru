@@ -254,6 +254,39 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val likedFeed = remember { vm.localFeed("likes", vm.decodePosts(vm.c.db.saved().likedPosts())) }
     val historyFeed = remember { vm.localFeed("history", vm.decodePosts(vm.c.db.history().recentPosts())) }
+    val downloadsState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    // Шапка встроена в каждую вкладку, поэтому её состояние живёт здесь: при переключении вкладок
+    // «Мои теги» не пересчитываются и не появляются заново с прыжком, раскрытие не сбрасывается.
+    val likes by vm.likeCount.collectAsStateWithLifecycle()
+    var tasteVersion by remember { mutableIntStateOf(0) }
+    var tagsExpanded by rememberSaveable { mutableStateOf(false) }
+    val myTags by produceState(emptyList<app.dudebooru.booru.rec.TasteTag>(), likes, tasteVersion) {
+        value = runCatching { vm.c.recs.profile().top(limit = 20) }.getOrDefault(value)
+    }
+
+    fun position(of: Int): Pair<Int, Int> = when (of) {
+        0 -> likedFeed.gridState.firstVisibleItemIndex to likedFeed.gridState.firstVisibleItemScrollOffset
+        1 -> historyFeed.gridState.firstVisibleItemIndex to historyFeed.gridState.firstVisibleItemScrollOffset
+        else -> downloadsState.firstVisibleItemIndex to downloadsState.firstVisibleItemScrollOffset
+    }
+
+    // Новая вкладка открывается там же, где стоит шапка сейчас: вкладки не прыгают под пальцем.
+    val selectTab: (Int) -> Unit = { next ->
+        if (next != tab) {
+            val (index, offset) = position(tab)
+            tab = next
+            val keep = if (index == 0) offset else 0
+            scope.launch {
+                when (next) {
+                    0 -> likedFeed.gridState.scrollToItem(0, keep)
+                    1 -> historyFeed.gridState.scrollToItem(0, keep)
+                    else -> downloadsState.scrollToItem(0, keep)
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -270,7 +303,24 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
             val stretch = remember(maxStretch) { AvatarStretch(maxStretch) }
             // Остаток прокрутки у верха — растяжке аватарки, а не «потяни, чтобы обновить».
             val listModifier = Modifier.nestedScroll(stretch.connection)
-            val header: @Composable () -> Unit = { ProfileHeader(vm, tab, onTab = { tab = it }, onEdit = onEdit, stretch = stretch.value) }
+            val header: @Composable () -> Unit = {
+                ProfileHeader(
+                    vm = vm,
+                    tab = tab,
+                    onTab = selectTab,
+                    onEdit = onEdit,
+                    stretch = stretch.value,
+                    myTags = myTags,
+                    tagsExpanded = tagsExpanded,
+                    onToggleTags = { tagsExpanded = !tagsExpanded },
+                    onMuteTag = { name ->
+                        scope.launch {
+                            vm.c.recs.mute(name)
+                            tasteVersion++
+                        }
+                    },
+                )
+            }
             when (tab) {
                 0 -> FeedList(
                     likedFeed,
@@ -288,7 +338,7 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
                     emptyContent = { EmptyState(rememberKaomoji(listOf("( ˘ω˘ )") + Kaomoji.BORED), stringResource(R.string.history_empty), null) },
                     listModifier = listModifier,
                 )
-                else -> DownloadsList(vm, downloads, header, listModifier)
+                else -> DownloadsList(vm, downloads, header, listModifier, downloadsState)
             }
         }
     }
@@ -296,7 +346,17 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
 
 /** Шапка профиля — первый элемент ленты вкладки: карточка с аватаркой по центру, счётчики, теги, вкладки. */
 @Composable
-private fun ProfileHeader(vm: MainViewModel, tab: Int, onTab: (Int) -> Unit, onEdit: () -> Unit, stretch: Float) {
+private fun ProfileHeader(
+    vm: MainViewModel,
+    tab: Int,
+    onTab: (Int) -> Unit,
+    onEdit: () -> Unit,
+    stretch: Float,
+    myTags: List<app.dudebooru.booru.rec.TasteTag>,
+    tagsExpanded: Boolean,
+    onToggleTags: () -> Unit,
+    onMuteTag: (String) -> Unit,
+) {
     val profile by vm.profile.collectAsStateWithLifecycle()
     val likes by vm.likeCount.collectAsStateWithLifecycle()
     val saved by vm.savedCount.collectAsStateWithLifecycle()
@@ -308,7 +368,7 @@ private fun ProfileHeader(vm: MainViewModel, tab: Int, onTab: (Int) -> Unit, onE
             Stat(saved, R.string.profile_saved)
             Stat(downloads.count { it.status == DownloadStatus.DONE }, R.string.profile_downloaded)
         }
-        MyTags(vm, likes)
+        MyTags(myTags, tagsExpanded, onToggleTags, onMuteTag)
         PrimaryTabRow(selectedTabIndex = tab, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
             listOf(R.string.profile_likes, R.string.drawer_history, R.string.drawer_downloads).forEachIndexed { i, label ->
                 Tab(selected = tab == i, onClick = { onTab(i) }, text = { Text(stringResource(label)) })
@@ -319,17 +379,11 @@ private fun ProfileHeader(vm: MainViewModel, tab: Int, onTab: (Int) -> Unit, onE
 
 /** «Мои теги»: что приложение считает твоим вкусом. Свёрнуты в одну строку; долгое нажатие — убрать лишнее. */
 @Composable
-private fun MyTags(vm: MainViewModel, likes: Int) {
-    val scope = rememberCoroutineScope()
-    var tasteVersion by remember { mutableIntStateOf(0) }
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val myTags by produceState(emptyList<app.dudebooru.booru.rec.TasteTag>(), likes, tasteVersion) {
-        value = runCatching { vm.c.recs.profile().top(limit = 20) }.getOrDefault(emptyList())
-    }
+private fun MyTags(myTags: List<app.dudebooru.booru.rec.TasteTag>, expanded: Boolean, onToggle: () -> Unit, onMute: (String) -> Unit) {
     if (myTags.isEmpty()) return
     val colors = LocalTagColors.current
     Row(
-        Modifier.fillMaxWidth().padding(top = 8.dp).clickable { expanded = !expanded }.padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(top = 8.dp).clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(stringResource(R.string.profile_my_tags), style = MaterialTheme.typography.titleSmall)
@@ -360,12 +414,7 @@ private fun MyTags(vm: MainViewModel, likes: Int) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = colors.of(tag.category).copy(alpha = 0.12f),
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(onClick = {}, onLongClick = {
-                            scope.launch {
-                                vm.c.recs.mute(tag.name)
-                                tasteVersion++
-                            }
-                        }),
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).combinedClickable(onClick = {}, onLongClick = { onMute(tag.name) }),
                     ) {
                         Text(tag.name.replace('_', ' '), color = colors.of(tag.category), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                     }
@@ -520,13 +569,19 @@ fun DownloadsScreen(vm: MainViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun DownloadsList(vm: MainViewModel, downloads: List<DownloadEntity>, header: (@Composable () -> Unit)? = null, modifier: Modifier = Modifier) {
+private fun DownloadsList(
+    vm: MainViewModel,
+    downloads: List<DownloadEntity>,
+    header: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    state: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val running = downloads.filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.PAUSED }
     val failed = downloads.filter { it.status == DownloadStatus.FAILED }
     val done = downloads.filter { it.status == DownloadStatus.DONE }
-    LazyColumn(Modifier.fillMaxSize().then(modifier), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize().then(modifier), state = state, contentPadding = PaddingValues(bottom = 24.dp)) {
         if (header != null) item(key = "header") { header() }
         if (downloads.isEmpty()) {
             item(key = "empty") { EmptyState(rememberKaomoji(listOf("(・ω・)ノ") + Kaomoji.BORED), stringResource(R.string.downloads_empty), null) }
