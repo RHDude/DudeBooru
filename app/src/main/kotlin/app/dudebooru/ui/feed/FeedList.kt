@@ -94,6 +94,8 @@ fun FeedList(
     /** Своя заглушка пустой ленты (у художника: «в режиме SFW у него пусто»). */
     emptyContent: (@Composable () -> Unit)? = null,
     header: (@Composable () -> Unit)? = null,
+    /** Модификатор самого списка: nested scroll здесь получает остаток прокрутки раньше «потяни, чтобы обновить». */
+    listModifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val state by controller.state.collectAsStateWithLifecycle()
@@ -180,7 +182,7 @@ fun FeedList(
                 contentPadding = PaddingValues(bottom = 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(theme.gridSpacing.dp),
                 verticalArrangement = Arrangement.spacedBy(theme.gridSpacing.dp),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().then(listModifier),
             ) {
                 if (header != null) item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
                 if (state.fromCache) item(key = "cache", span = { GridItemSpan(maxLineSpan) }) { CacheBanner(state, controller) }
@@ -204,7 +206,7 @@ fun FeedList(
                 item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { Footer(state, controller, context, actions, emptyContent) }
             }
         } else {
-            LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 32.dp), modifier = Modifier.fillMaxSize()) {
+            LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 32.dp), modifier = Modifier.fillMaxSize().then(listModifier)) {
                 if (header != null) item(key = "header") { header() }
                 if (state.fromCache) item(key = "cache") { CacheBanner(state, controller) }
                 if (state.hiddenCount > 0 && showHiddenMark) {

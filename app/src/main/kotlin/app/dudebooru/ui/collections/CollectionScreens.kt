@@ -63,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -84,7 +85,6 @@ import app.dudebooru.ui.feed.PostActions
 import app.dudebooru.ui.feed.avatarColor
 import app.dudebooru.ui.feed.formatSize
 import app.dudebooru.ui.icons.DudeIcons
-import app.dudebooru.ui.main.Avatar
 import app.dudebooru.ui.main.CountBadge
 import app.dudebooru.ui.main.MainViewModel
 import app.dudebooru.ui.main.displayName
@@ -254,7 +254,6 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val likedFeed = remember { vm.localFeed("likes", vm.decodePosts(vm.c.db.saved().likedPosts())) }
     val historyFeed = remember { vm.localFeed("history", vm.decodePosts(vm.c.db.history().recentPosts())) }
-    val header: @Composable () -> Unit = { ProfileHeader(vm, tab, onTab = { tab = it }, onEdit = onEdit) }
 
     Scaffold(
         topBar = {
@@ -265,7 +264,13 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
             )
         },
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.padding(padding).fillMaxSize()) {
+            // Растяжка до квадрата во всю карточку (ширина экрана минус поля 12 dp).
+            val maxStretch = with(androidx.compose.ui.platform.LocalDensity.current) { (maxWidth - 24.dp - 104.dp).toPx().coerceAtLeast(1f) }
+            val stretch = remember(maxStretch) { AvatarStretch(maxStretch) }
+            // Остаток прокрутки у верха — растяжке аватарки, а не «потяни, чтобы обновить».
+            val listModifier = Modifier.nestedScroll(stretch.connection)
+            val header: @Composable () -> Unit = { ProfileHeader(vm, tab, onTab = { tab = it }, onEdit = onEdit, stretch = stretch.value) }
             when (tab) {
                 0 -> FeedList(
                     likedFeed,
@@ -273,6 +278,7 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
                     grid = true,
                     header = header,
                     emptyContent = { EmptyState(rememberKaomoji(listOf("(´･ω･`)") + Kaomoji.BORED), stringResource(R.string.likes_empty), null) },
+                    listModifier = listModifier,
                 )
                 1 -> FeedList(
                     historyFeed,
@@ -280,30 +286,24 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
                     grid = true,
                     header = header,
                     emptyContent = { EmptyState(rememberKaomoji(listOf("( ˘ω˘ )") + Kaomoji.BORED), stringResource(R.string.history_empty), null) },
+                    listModifier = listModifier,
                 )
-                else -> DownloadsList(vm, downloads, header)
+                else -> DownloadsList(vm, downloads, header, listModifier)
             }
         }
     }
 }
 
-/** Шапка профиля — первый элемент ленты вкладки. */
+/** Шапка профиля — первый элемент ленты вкладки: карточка с аватаркой по центру, счётчики, теги, вкладки. */
 @Composable
-private fun ProfileHeader(vm: MainViewModel, tab: Int, onTab: (Int) -> Unit, onEdit: () -> Unit) {
+private fun ProfileHeader(vm: MainViewModel, tab: Int, onTab: (Int) -> Unit, onEdit: () -> Unit, stretch: Float) {
     val profile by vm.profile.collectAsStateWithLifecycle()
     val likes by vm.likeCount.collectAsStateWithLifecycle()
     val saved by vm.savedCount.collectAsStateWithLifecycle()
     val downloads by vm.downloads.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().clickable(onClick = onEdit).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Avatar(profile?.avatarUrl, Modifier.size(72.dp))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(profile.displayName(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text("@" + profile?.nick.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceAround) {
+        ProfileCard(profile?.avatarUrl, profile.displayName(), profile?.nick.orEmpty(), stretch, onClick = onEdit)
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp), horizontalArrangement = Arrangement.SpaceAround) {
             Stat(likes, R.string.profile_likes)
             Stat(saved, R.string.profile_saved)
             Stat(downloads.count { it.status == DownloadStatus.DONE }, R.string.profile_downloaded)
@@ -520,13 +520,13 @@ fun DownloadsScreen(vm: MainViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun DownloadsList(vm: MainViewModel, downloads: List<DownloadEntity>, header: (@Composable () -> Unit)? = null) {
+private fun DownloadsList(vm: MainViewModel, downloads: List<DownloadEntity>, header: (@Composable () -> Unit)? = null, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val running = downloads.filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.PAUSED }
     val failed = downloads.filter { it.status == DownloadStatus.FAILED }
     val done = downloads.filter { it.status == DownloadStatus.DONE }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize().then(modifier), contentPadding = PaddingValues(bottom = 24.dp)) {
         if (header != null) item(key = "header") { header() }
         if (downloads.isEmpty()) {
             item(key = "empty") { EmptyState(rememberKaomoji(listOf("(・ω・)ノ") + Kaomoji.BORED), stringResource(R.string.downloads_empty), null) }
