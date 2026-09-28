@@ -1490,6 +1490,18 @@ private fun LicensesPage(onBack: () -> Unit) {
         Triple("Telephoto", "Saket Narayan · Apache 2.0", "https://github.com/saket/telephoto"),
     )
     SettingsPageScaffold(stringResource(R.string.about_licenses), onBack) {
+        // Лицензия самого приложения — первой.
+        item(key = "app") {
+            SettingsGroup(footer = stringResource(R.string.about_app_license_hint)) {
+                item {
+                    SettingsRow(
+                        "DudeBooru",
+                        subtitle = stringResource(R.string.about_app_license),
+                        onClick = { openUrl(context, "https://www.gnu.org/licenses/gpl-3.0.html") },
+                    )
+                }
+            }
+        }
         item(key = "libs") {
             SettingsGroup(footer = stringResource(R.string.about_licenses_hint)) {
                 libraries.forEach { (name, license, url) ->
