@@ -809,6 +809,7 @@ private fun ContentPage(
                             stringResource(R.string.censor_in_viewer),
                             prefs.inViewer,
                             { vm.setCensorPrefs(prefs.copy(inViewer = it)) },
+                            subtitle = stringResource(R.string.censor_in_viewer_hint),
                         )
                     }
                     item {

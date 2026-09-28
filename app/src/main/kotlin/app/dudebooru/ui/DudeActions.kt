@@ -93,6 +93,8 @@ class DudeActions(
 
     /** Сначала карточка получает общий элемент, кадром позже открывается просмотр — картинка перелетает из неё. */
     override fun open(controller: FeedController, post: Post) {
+        // Открыл пост сам — он показан; соседние в просмотре остаются под цензурой, пока не нажмёшь.
+        if (!vm.censorPrefs.value.inViewer) vm.reveal(post)
         vm.sharedKey.value = post.key
         scope.launch {
             androidx.compose.runtime.withFrameNanos { }

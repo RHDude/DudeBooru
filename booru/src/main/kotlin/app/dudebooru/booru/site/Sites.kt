@@ -67,8 +67,11 @@ object Sites {
         burst = 4,
     )
 
-    /** Порядок папок по умолчанию. Sakugabooru выключен, пока его не включат в настройках. */
-    val builtIn: List<SiteConfig> = listOf(DANBOORU, YANDERE, KONACHAN, SAFEBOORU, SAKUGABOORU)
+    /** Порядок папок по умолчанию. */
+    val builtIn: List<SiteConfig> = listOf(DANBOORU, YANDERE, KONACHAN, SAFEBOORU)
 
-    fun byId(id: String): SiteConfig? = builtIn.firstOrNull { it.id == id }
+    /** Убранные из источников сайты: папок и настроек у них нет, но сохранённые оттуда посты открываются. */
+    val retired: List<SiteConfig> = listOf(SAKUGABOORU)
+
+    fun byId(id: String): SiteConfig? = builtIn.firstOrNull { it.id == id } ?: retired.firstOrNull { it.id == id }
 }

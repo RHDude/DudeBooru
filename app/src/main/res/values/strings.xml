@@ -51,7 +51,8 @@
     <string name="censor_style_blur">Blur</string>
     <string name="censor_style_pixel">Pixels</string>
     <string name="censor_strength">Strength</string>
-    <string name="censor_in_viewer">Also cover in the viewer</string>
+    <string name="censor_in_viewer">Keep the opened post covered too</string>
+    <string name="censor_in_viewer_hint">Other posts in the viewer and the random post stay covered until you tap them</string>
     <string name="censor_sensitive">Also blur rating:s (slightly revealing)</string>
     <string name="settings_show_hidden">“N hidden” mark in the feed</string>
     <string name="adult_title">Are you 18 or older?</string>
@@ -162,7 +163,7 @@
     <string name="recs_explore">just to try — outside your taste</string>
     <string name="similar_title">Similar</string>
     <string name="similar_same_image">The same image on other sites:</string>
-    <string name="profile_my_tags_hint">Long press removes a tag from your taste</string>
+    <string name="profile_my_tags_hint">Tags that keep coming up in what you like and save. Long press removes a tag from your taste</string>
     <string name="icon_neutral_label">Gallery</string>
     <string name="icon_dudi">Dudi</string>
     <string name="icon_monet">Monet</string>
@@ -264,6 +265,10 @@
     <string name="viewer_position">%1$d of %2$d</string>
     <string name="viewer_details">Details</string>
     <string name="viewer_tap_for_sound">Tap for sound</string>
+    <string name="video_play">Play</string>
+    <string name="video_pause">Pause</string>
+    <string name="video_sound_on">Turn sound on</string>
+    <string name="video_sound_off">Mute</string>
     <string name="details_favs">favorited by %1$d</string>
     <string name="details_source">Source</string>
     <string name="details_family">Parent and children</string>
@@ -398,6 +403,7 @@
     <string name="theme_override_hint">The button in the menu switches the theme until the next scheduled change</string>
     <string name="theme_custom">Custom</string>
     <string name="theme_classic">Classic</string>
+    <string name="theme_teto">Teto</string>
     <string name="theme_variant_light">Light</string>
     <string name="theme_variant_dark">Dark</string>
     <string name="theme_name">Name</string>
@@ -524,18 +530,13 @@
     <string name="network_proxy">Proxy</string>
 
     <string name="about_whats_new">What is new in %1$s</string>
-    <string name="whats_new">• exteraGram-style settings: centered profile, grouped sections, centered titles
-• New sections: sources and folders, viewer, recommendations, privacy, data and storage
-• All icons replaced with Google Material Symbols
-• App lock with fingerprint, face or PIN; screenshot blocking
-• Viewer: screen stays on, volume keys turn pages, original at once
-• Folders stretch to the screen width, the highlight follows the swipe
-• Long press on a post opens quick actions instead of downloading right away
-• Accounts: sign-in status in one line, the sign-in form expands on tap
-• About: error log, licenses, links to the sites
-• The feed header no longer turns lighter while scrolling
-• Tag search without an account: the sort always works, extra tags are checked in the app, the feed loads in larger pages
-• Random post on Danbooru no longer fails with error 500</string>
+    <string name="whats_new">• Censoring now works in the viewer too: neighbouring posts and the random post stay covered until you tap them
+• “My tags” come only from what you like and save, and only tags that keep coming up
+• Video player: seekable progress bar, time, pause and sound
+• Videos and GIFs are marked differently in the feed and the grid
+• Tap the open folder to jump to the top
+• New “Teto” theme
+• Sakugabooru removed from the sources</string>
     <!-- Settings: sources, viewer, privacy, data, about -->
     <string name="settings_profile_edit">Edit profile</string>
     <string name="settings_value_relogin">Sign in again</string>
@@ -600,7 +601,7 @@
     <string name="about_licenses">Open source licenses</string>
     <string name="about_licenses_hint">DudeBooru is built on these open libraries</string>
     <string name="about_sites">Sources</string>
-    <string name="about_disclaimer">Pictures and tags belong to their authors and the sites. DudeBooru is not affiliated with Danbooru, Yande.re, Konachan or Sakugabooru</string>
+    <string name="about_disclaimer">Pictures and tags belong to their authors and the sites. DudeBooru is not affiliated with Danbooru, Yande.re or Konachan</string>
     <string name="lock_title">DudeBooru is locked</string>
     <string name="lock_unlock">Unlock</string>
     <string name="lock_prompt_title">Unlock DudeBooru</string>

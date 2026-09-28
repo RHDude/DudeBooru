@@ -17,7 +17,8 @@ class SiteRegistry(
 
     val sites: List<SiteConfig> get() = Sites.builtIn
 
-    fun site(id: String): SiteConfig? = sites.firstOrNull { it.id == id }
+    /** Включая убранные сайты — чтобы открывались посты, сохранённые с них раньше. */
+    fun site(id: String): SiteConfig? = Sites.byId(id)
 
     fun engine(site: SiteConfig): BooruEngine = engines.computeIfAbsent(site.id) { Engines.create(site, http, tags) }
 

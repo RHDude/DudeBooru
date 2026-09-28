@@ -2,6 +2,7 @@ package app.dudebooru.booru.rec
 
 import app.dudebooru.booru.model.Post
 import app.dudebooru.booru.model.TagCategory
+import kotlin.math.ceil
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -21,9 +22,13 @@ data class TasteTag(val name: String, val category: TagCategory, val weight: Dou
 
 /**
  * Профиль вкуса: веса тегов из лайкнутого и сохранённого.
+ * В профиль попадает только то, что повторяется: тег должен встретиться минимум в двух разных
+ * лайкнутых или сохранённых постах, а general-тег — ещё и в заметной доле из них (5%).
+ * Самые общие теги (1girl, solo, long_hair — больше чем у каждого пятого поста на сайте) не берутся вовсе.
  * Категории: художник ×3, персонаж ×2, копирайт ×1.5, general ×1, meta не учитывается.
- * Редкие теги важнее частых (TF-IDF), свежие лайки весят больше (полураспад 60 дней),
- * сохранение ×2, «Не интересно» вычитает.
+ * Редкие теги важнее частых (TF-IDF), свежие лайки весят больше (полураспад 60 дней), сохранение ×2.
+ * «Не интересно» тегов не добавляет: оно снижает вес тегов профиля, а теги, повторяющиеся
+ * в нескольких «Не интересно», получают отрицательный вес и опускают такие посты в подборке.
  */
 class TasteProfile private constructor(
     private val weights: Map<String, TasteTag>,
@@ -43,9 +48,24 @@ class TasteProfile private constructor(
 
     val maxWeight: Double = weights.values.maxOfOrNull { it.weight }?.coerceAtLeast(0.0) ?: 0.0
 
+    /** Сумма вклада тега и в скольких разных постах он встретился. */
+    private class Tally(val category: TagCategory) {
+        var sum = 0.0
+        val posts = HashSet<String>()
+    }
+
     companion object {
         const val HALF_LIFE_DAYS = 60.0
         private const val DAY = 24L * 3600 * 1000
+
+        /** Минимум разных постов с тегом, чтобы он попал в профиль. */
+        const val MIN_SUPPORT = 2
+
+        /** General-тег нужен ещё и в такой доле лайкнутого: при 200 лайках — в 10 постах. */
+        const val GENERAL_SHARE = 0.05
+
+        /** ln(5): general-теги чаще, чем у каждого пятого поста на сайте, вкуса не описывают. */
+        val COMMON_IDF = ln(5.0)
 
         fun categoryWeight(category: TagCategory): Double = when (category) {
             TagCategory.ARTIST -> 3.0
@@ -58,37 +78,56 @@ class TasteProfile private constructor(
         /**
          * @param idf редкость тега: ln(постов на сайте / постов с тегом). Неизвестный тег — средняя редкость.
          * @param muted теги, которые человек убрал из «Моих тегов».
+         * @param minSupport в скольких разных постах должен встретиться тег; 1 — брать все теги (для «Найти похожие»).
          */
         fun build(
             signals: List<Signal>,
             now: Long,
             idf: (String) -> Double? = { null },
             muted: Set<String> = emptySet(),
+            minSupport: Int = MIN_SUPPORT,
         ): TasteProfile {
-            val sums = HashMap<String, Pair<TagCategory, Double>>()
+            val liked = HashMap<String, Tally>()
+            val disliked = HashMap<String, Tally>()
             for (signal in signals) {
                 val ageDays = ((now - signal.at).coerceAtLeast(0)).toDouble() / DAY
                 val decay = 0.5.pow(ageDays / HALF_LIFE_DAYS)
                 val base = signal.kind.weight * decay
+                val into = if (signal.kind.weight > 0) liked else disliked
                 for (category in TagCategory.entries) {
                     val cw = categoryWeight(category)
                     if (cw == 0.0) continue
                     for (tag in signal.post.tags.byCategory(category)) {
                         if (tag in muted) continue
-                        val rarity = idf(tag) ?: DEFAULT_IDF
-                        val add = base * cw * rarity.coerceIn(MIN_IDF, MAX_IDF)
-                        val current = sums[tag]
-                        sums[tag] = category to ((current?.second ?: 0.0) + add)
+                        val rarity = idf(tag)
+                        if (minSupport > 1 && category == TagCategory.GENERAL && rarity != null && rarity < COMMON_IDF) continue
+                        val tally = into.getOrPut(tag) { Tally(category) }
+                        tally.sum += base * cw * (rarity ?: DEFAULT_IDF).coerceIn(MIN_IDF, MAX_IDF)
+                        tally.posts += signal.post.key
                     }
                 }
             }
-            val weights = sums.mapValues { (name, v) -> TasteTag(name, v.first, v.second) }
-            return TasteProfile(weights, signals.size, signals.count { it.kind != SignalKind.DISLIKE })
+            fun needed(category: TagCategory, total: Int): Int =
+                if (category == TagCategory.GENERAL) maxOf(minSupport, ceil(total * GENERAL_SHARE).toInt()) else minSupport
+
+            val likedPosts = signals.filter { it.kind.weight > 0 }.map { it.post.key }.toSet().size
+            val dislikedPosts = signals.filter { it.kind.weight < 0 }.map { it.post.key }.toSet().size
+            val weights = HashMap<String, TasteTag>()
+            for ((name, tally) in liked) {
+                if (tally.posts.size < needed(tally.category, likedPosts)) continue
+                val penalty = disliked[name]?.sum ?: 0.0
+                weights[name] = TasteTag(name, tally.category, tally.sum + penalty)
+            }
+            for ((name, tally) in disliked) {
+                if (name in weights || tally.posts.size < needed(tally.category, dislikedPosts)) continue
+                weights[name] = TasteTag(name, tally.category, tally.sum)
+            }
+            return TasteProfile(weights, signals.size, likedPosts)
         }
 
         /** «Найти похожие»: профиль из одного поста. */
         fun ofPost(post: Post, idf: (String) -> Double? = { null }): TasteProfile =
-            build(listOf(Signal(post, SignalKind.LIKE, 0)), 0, idf)
+            build(listOf(Signal(post, SignalKind.LIKE, 0)), 0, idf, minSupport = 1)
 
         const val DEFAULT_IDF = 4.0
         const val MIN_IDF = 0.05

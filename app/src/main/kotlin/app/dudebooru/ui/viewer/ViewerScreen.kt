@@ -189,13 +189,13 @@ fun ViewerScreen(
                 val censor = LocalCensor.current
                 Box(Modifier.fillMaxSize().sharedPost(post.key, enabled = page == pager.currentPage)) {
                 when {
-                    censor.hides(post, inViewer = true) -> CensoredImage(
+                    censor.hides(post) -> CensoredImage(
                         post = post,
                         style = censor.prefs.style,
                         strength = censor.prefs.strength,
                         onReveal = { actions.reveal(post) },
                     )
-                    post.mediaType == MediaType.VIDEO -> VideoPage(post, active = page == pager.currentPage, onTap = { barsVisible = !barsVisible })
+                    post.mediaType == MediaType.VIDEO -> VideoPage(post, active = page == pager.currentPage, barsVisible = barsVisible, onTap = { barsVisible = !barsVisible })
                     else -> ZoomPage(post, onTap = { barsVisible = !barsVisible })
                 }
                 }
@@ -211,6 +211,7 @@ fun ViewerScreen(
                 val position = stringResource(R.string.viewer_position, current.card + 1, state.items.size) +
                     if (current.cardSize > 1) " · ${current.inCard + 1}/${current.cardSize}" else ""
                 Text(position, color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (current.post.mediaType == MediaType.GIF) app.dudebooru.ui.feed.MediaBadge(current.post, Modifier.padding(end = 4.dp))
                 val group = state.items.getOrNull(current.card)?.posts.orEmpty()
                 PostMenuButton(current.post, group, actions, tint = Color.White)
             }

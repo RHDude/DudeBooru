@@ -39,6 +39,7 @@ internal data class DanbooruPostDto(
 @Serializable
 internal data class DanbooruMediaAssetDto(
     val variants: List<DanbooruVariantDto> = emptyList(),
+    val duration: Double? = null,
 )
 
 @Serializable

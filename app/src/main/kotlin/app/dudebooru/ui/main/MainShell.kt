@@ -171,7 +171,15 @@ private fun MainFolders(vm: MainViewModel, folders: List<SiteConfig>, site: Site
                 folders = folders,
                 pager = pager,
                 counts = if (folderPrefs.newCounts) counts else emptyMap(),
-                onSelect = vm::select,
+                onSelect = { id ->
+                    if (id == shown.id) {
+                        // Уже открытая папка: как в Telegram — лента наверх, шапка возвращается.
+                        scrollBehavior.state.heightOffset = 0f
+                        vm.folderFeed(id).requestScrollTop()
+                    } else {
+                        vm.select(id)
+                    }
+                },
                 onMarkSeen = vm::markAllSeen,
                 onHide = vm::hideFolder,
                 onMove = vm::moveFolder,

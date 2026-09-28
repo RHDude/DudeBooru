@@ -405,6 +405,7 @@ class DanbooruEngine(
                 isPending -> PostStatus.PENDING
                 else -> PostStatus.ACTIVE
             },
+            duration = mediaAsset?.duration?.takeIf { media == MediaType.VIDEO && it > 0 },
         )
     }
 
