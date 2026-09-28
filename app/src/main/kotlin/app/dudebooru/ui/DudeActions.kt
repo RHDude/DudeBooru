@@ -25,6 +25,8 @@ class DudeActions(
     private val context: Context,
     private val vm: MainViewModel,
     private val scope: CoroutineScope,
+    /** Android 13+: спросить разрешение на уведомления перед первой загрузкой. */
+    private val askNotifications: () -> Unit = {},
 ) : PostActions {
     private val c get() = vm.c
 
@@ -56,22 +58,21 @@ class DudeActions(
         vm.openArtist(post.site, name)
     }
 
-    override fun download(post: Post, original: Boolean) {
-        scope.launch {
-            try {
-                val result = c.downloader.download(post, original)
-                toast(context.getString(R.string.download_done, result.displayPath))
-            } catch (e: Exception) {
-                toast(context.getString(R.string.download_failed, context.errorText(e)))
-            }
-        }
-    }
+    override fun download(post: Post, original: Boolean) = enqueue(listOf(post), original)
 
-    override fun downloadAll(posts: List<Post>) {
+    override fun downloadAll(posts: List<Post>) = enqueue(posts, original = true)
+
+    private fun enqueue(posts: List<Post>, original: Boolean) {
+        askNotifications()
         scope.launch {
-            var ok = 0
-            for (post in posts) if (runCatching { c.downloader.download(post, original = true) }.isSuccess) ok++
-            toast(context.getString(R.string.download_all_done, ok, posts.size))
+            val result = c.downloads.enqueue(posts, original)
+            toast(
+                when {
+                    result.added == 0 && result.skipped > 0 -> context.getString(R.string.download_already)
+                    result.skipped > 0 -> context.getString(R.string.download_queued_skipped, result.added, result.skipped)
+                    else -> context.getString(R.string.download_queued, result.added)
+                },
+            )
         }
     }
 
@@ -150,6 +151,8 @@ class DudeActions(
     override fun postUrlBase(post: Post): String = site(post).baseUrl
 
     override fun reveal(post: Post) = vm.reveal(post)
+
+    override fun viewed(post: Post) = vm.recordView(post)
 
     override fun restoreTag(expression: String) {
         scope.launch { c.negative.removeExpression(expression) }

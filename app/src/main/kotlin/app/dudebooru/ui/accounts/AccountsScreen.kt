@@ -2,10 +2,12 @@
 
 package app.dudebooru.ui.accounts
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,7 +50,9 @@ import app.dudebooru.data.account.StoredAccount
 import app.dudebooru.data.net.ProxyConfig
 import app.dudebooru.data.settings.CensorPrefs
 import app.dudebooru.data.settings.CensorStyle
+import app.dudebooru.data.settings.DownloadPrefs
 import app.dudebooru.data.settings.FeedPrefs
+import app.dudebooru.data.settings.SyncPrefs
 import app.dudebooru.ui.icons.DudeIcons
 
 @Composable
@@ -63,7 +67,7 @@ fun AccountsScreen(vm: AccountsViewModel, onBack: () -> Unit, onOpenNegativeTags
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            androidx.compose.material3.CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.accounts_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(DudeIcons.Back, stringResource(R.string.back)) }
@@ -76,6 +80,15 @@ fun AccountsScreen(vm: AccountsViewModel, onBack: () -> Unit, onOpenNegativeTags
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item(key = "profile") { ProfileCard(vm) }
+            item(key = "sync") {
+                val sync by vm.syncPrefs.collectAsStateWithLifecycle()
+                SyncCard(sync, vm::setSyncPrefs)
+            }
+            item(key = "downloads") {
+                val dl by vm.downloadPrefs.collectAsStateWithLifecycle()
+                DownloadsCard(vm, dl, vm::setDownloadPrefs)
+            }
             item(key = "content") {
                 ContentCard(censorEnabled, censorPrefs, showHidden, vm::setCensorEnabled, vm::setCensorPrefs, vm::setShowHiddenCount, onOpenNegativeTags)
             }
@@ -99,6 +112,10 @@ fun AccountsScreen(vm: AccountsViewModel, onBack: () -> Unit, onOpenNegativeTags
                 )
             }
             item(key = "network") { NetworkCard(proxy, vm::saveProxy) }
+            item(key = "doh") {
+                val doh by vm.doh.collectAsStateWithLifecycle()
+                DohCard(doh, vm::setDoh)
+            }
         }
     }
 }
@@ -297,6 +314,135 @@ private fun ContentCard(
             }
             SwitchRow(stringResource(R.string.settings_show_hidden), showHidden, onShowHidden)
             OutlinedButton(onClick = onOpenNegativeTags) { Text(stringResource(R.string.drawer_negative_tags)) }
+        }
+    }
+}
+
+/** Настройки → Аккаунты и профиль: локальные имя, @ник и аватарка — на сайты не отправляются. */
+@Composable
+private fun ProfileCard(vm: AccountsViewModel) {
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    var name by rememberSaveable(profile?.name) { mutableStateOf(profile?.name.orEmpty()) }
+    var nick by rememberSaveable(profile?.nick) { mutableStateOf(profile?.nick.orEmpty()) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> uri?.let(vm::setAvatarFromGallery) }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.settings_profile), style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                app.dudebooru.ui.main.Avatar(profile?.avatarUrl, Modifier.size(56.dp))
+                Spacer(Modifier.size(12.dp))
+                Column {
+                    androidx.compose.material3.TextButton(onClick = {
+                        picker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }) { Text(stringResource(R.string.profile_avatar_pick)) }
+                    if (profile?.avatarUrl != null) {
+                        androidx.compose.material3.TextButton(onClick = vm::resetAvatar) { Text(stringResource(R.string.profile_avatar_reset)) }
+                    }
+                }
+            }
+            Text(stringResource(R.string.profile_avatar_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.profile_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = nick, onValueChange = { nick = it.removePrefix("@") }, label = { Text(stringResource(R.string.profile_nick)) }, prefix = { Text("@") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Button(onClick = { vm.setProfile(name, nick) }, enabled = name != profile?.name || nick != profile?.nick) { Text(stringResource(R.string.save)) }
+        }
+    }
+}
+
+/** Что уходит на сайт: сохранённые синхронизируются по умолчанию, лайки — только по желанию. */
+@Composable
+private fun SyncCard(prefs: SyncPrefs, onChange: (SyncPrefs) -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.settings_sync), style = MaterialTheme.typography.titleMedium)
+            SwitchRow(stringResource(R.string.sync_saved), prefs.syncSaved) { onChange(prefs.copy(syncSaved = it)) }
+            Text(stringResource(R.string.sync_saved_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SwitchRow(stringResource(R.string.mirror_likes), prefs.mirrorLikes) { onChange(prefs.copy(mirrorLikes = it)) }
+            Text(stringResource(R.string.mirror_likes_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Настройки → Скачивание: папка (можно на SD-карту), шаблон имени с предпросмотром, Wi-Fi, параллельность, теги. */
+@Composable
+private fun DownloadsCard(vm: AccountsViewModel, prefs: DownloadPrefs, onChange: (DownloadPrefs) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val treePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            val flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, flags) }
+            onChange(prefs.copy(treeUri = uri.toString()))
+        }
+    }
+    var template by rememberSaveable(prefs.template) { mutableStateOf(prefs.template) }
+    val preview = remember(template) {
+        runCatching { app.dudebooru.booru.download.NameTemplate.render(template, vm.samplePost(), "jpg") }.getOrDefault("")
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.settings_downloads), style = MaterialTheme.typography.titleMedium)
+            val folderLabel = prefs.treeUri?.let { android.net.Uri.parse(it).lastPathSegment?.substringAfter(':') } ?: stringResource(R.string.dl_folder_default)
+            Text(stringResource(R.string.dl_folder, folderLabel), style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { treePicker.launch(null) }) { Text(stringResource(R.string.dl_folder_pick)) }
+                if (prefs.treeUri != null) OutlinedButton(onClick = { onChange(prefs.copy(treeUri = null)) }) { Text(stringResource(R.string.dl_folder_reset)) }
+            }
+            OutlinedTextField(
+                value = template,
+                onValueChange = { template = it },
+                label = { Text(stringResource(R.string.dl_template)) },
+                supportingText = { Text(stringResource(R.string.dl_template_preview, preview)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                app.dudebooru.booru.download.NameTemplate.VARIABLES.joinToString(" ") { "{$it}" },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (template != prefs.template) {
+                Button(onClick = { onChange(prefs.copy(template = template.ifBlank { DownloadPrefs.DEFAULT_TEMPLATE })) }) { Text(stringResource(R.string.save)) }
+            }
+            SwitchRow(stringResource(R.string.dl_wifi_only), prefs.wifiOnly) { onChange(prefs.copy(wifiOnly = it)) }
+            SwitchRow(stringResource(R.string.dl_write_tags), prefs.writeTags) { onChange(prefs.copy(writeTags = it)) }
+            Text(stringResource(R.string.dl_parallel, prefs.parallel), style = MaterialTheme.typography.bodyMedium)
+            androidx.compose.material3.Slider(
+                value = prefs.parallel.toFloat(),
+                onValueChange = { onChange(prefs.copy(parallel = it.toInt().coerceIn(1, 4))) },
+                valueRange = 1f..4f,
+                steps = 2,
+            )
+        }
+    }
+}
+
+/** DNS-over-HTTPS — если провайдер режет DNS-ответы для сайта («адрес не найден»). */
+@Composable
+private fun DohCard(current: app.dudebooru.data.net.DohProvider, onChange: (app.dudebooru.data.net.DohProvider) -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.doh_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.doh_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            app.dudebooru.data.net.DohProvider.entries.forEach { provider ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { onChange(provider) }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.RadioButton(selected = provider == current, onClick = { onChange(provider) })
+                    Text(
+                        when (provider) {
+                            app.dudebooru.data.net.DohProvider.NONE -> stringResource(R.string.doh_system)
+                            app.dudebooru.data.net.DohProvider.CLOUDFLARE -> "Cloudflare"
+                            app.dudebooru.data.net.DohProvider.GOOGLE -> "Google"
+                            app.dudebooru.data.net.DohProvider.QUAD9 -> "Quad9"
+                            app.dudebooru.data.net.DohProvider.ADGUARD -> "AdGuard"
+                        },
+                    )
+                }
+            }
         }
     }
 }

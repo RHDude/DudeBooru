@@ -18,7 +18,11 @@ import java.util.Locale
 fun Context.errorText(error: Throwable): String {
     val site = (error as? BooruException)?.siteId?.let { id -> Sites.byId(id)?.name ?: id } ?: ""
     return when (error) {
-        is BooruException.NotResponding -> getString(R.string.error_not_responding, site)
+        is BooruException.NotResponding -> if (error.cause is java.net.UnknownHostException) {
+            getString(R.string.error_dns, site)
+        } else {
+            getString(R.string.error_not_responding, site)
+        }
         is BooruException.ServerError -> getString(R.string.error_server, site, error.code)
         is BooruException.TooManyRequests -> getString(R.string.error_too_many, site, error.retryAfterSeconds.toInt())
         is BooruException.Forbidden -> getString(R.string.error_forbidden, site)

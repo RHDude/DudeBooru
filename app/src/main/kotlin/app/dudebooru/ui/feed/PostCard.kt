@@ -233,6 +233,8 @@ private fun TapImage(
             .pointerInput(post.key) {
                 detectTapGestures(
                     onTap = { onTap(post) },
+                    // Оригинал за два касания: долгое нажатие на превью.
+                    onLongPress = { actions?.download(post, original = true) },
                     onDoubleTap = double@{
                         if (!prefs.doubleTapLike) return@double
                         onDoubleTap(post)
@@ -278,6 +280,15 @@ private fun TapImage(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
             ) {
                 Text(stringResource(R.string.post_long_whole), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+            }
+        }
+        if (post.md5 != null && post.md5 in LocalDownloaded.current) {
+            Surface(
+                color = Color.Black.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp),
+            ) {
+                Icon(DudeIcons.Download, stringResource(R.string.post_downloaded), tint = Color.White, modifier = Modifier.padding(4.dp).size(16.dp))
             }
         }
         if (post.mediaType != MediaType.IMAGE) {

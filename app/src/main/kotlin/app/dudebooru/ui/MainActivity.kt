@@ -45,7 +45,13 @@ import app.dudebooru.ui.accounts.AccountsViewModel
 import app.dudebooru.ui.feed.Collections
 import app.dudebooru.ui.feed.CensorState
 import app.dudebooru.ui.feed.LocalCensor
+import app.dudebooru.ui.collections.ArtistsScreen
+import app.dudebooru.ui.collections.DownloadsScreen
+import app.dudebooru.ui.collections.HistoryScreen
+import app.dudebooru.ui.collections.ProfileScreen
+import app.dudebooru.ui.collections.SavedScreen
 import app.dudebooru.ui.feed.LocalCollections
+import app.dudebooru.ui.feed.LocalDownloaded
 import app.dudebooru.ui.feed.LocalFeedPrefs
 import app.dudebooru.ui.feed.LocalPostActions
 import app.dudebooru.ui.filter.NegativeTagsScreen
@@ -97,7 +103,20 @@ class MainActivity : ComponentActivity() {
 private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    val actions = remember { DudeActions(context, vm, scope) }
+    val notifications = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
+    val actions = remember {
+        DudeActions(context, vm, scope) {
+            if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                notifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+    val downloaded by vm.downloadedMd5.collectAsStateWithLifecycle()
     val liked by vm.liked.collectAsStateWithLifecycle()
     val saved by vm.saved.collectAsStateWithLifecycle()
     val feedPrefs by vm.feedPrefs.collectAsStateWithLifecycle()
@@ -113,6 +132,7 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
         LocalPostActions provides actions,
         LocalFeedPrefs provides feedPrefs.copy(showHiddenCount = showHidden),
         LocalCensor provides CensorState(censorOn, mode, censorPrefs, revealed),
+        LocalDownloaded provides downloaded,
     ) {
         Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
             BackHandler { if (!vm.back()) activity?.finish() }
@@ -166,6 +186,11 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                 }
                 Route.NegativeTags -> NegativeTagsScreen(vm, onBack = { vm.back() })
                 is Route.Soon -> SoonScreen(route.title, route.step, onBack = { vm.back() })
+                Route.Saved -> SavedScreen(vm, actions, onBack = { vm.back() })
+                Route.Profile -> ProfileScreen(vm, actions, onBack = { vm.back() }, onEdit = { vm.navigate(Route.Settings) })
+                Route.History -> HistoryScreen(vm, actions, onBack = { vm.back() })
+                Route.Artists -> ArtistsScreen(vm, onBack = { vm.back() })
+                Route.Downloads -> DownloadsScreen(vm, onBack = { vm.back() })
             }
             NotInterestedSheet(actions)
             AdultDialog(vm)

@@ -5,8 +5,12 @@ import android.os.Build
 import app.dudebooru.booru.net.BooruHttp
 import app.dudebooru.data.SiteRegistry
 import app.dudebooru.data.account.AccountRepository
+import app.dudebooru.data.collections.CollectionsRepository
+import app.dudebooru.data.collections.SubscriptionRepository
 import app.dudebooru.data.db.AppDatabase
+import app.dudebooru.data.downloads.DownloadRepository
 import app.dudebooru.data.filter.NegativeTags
+import app.dudebooru.data.net.DynamicDns
 import app.dudebooru.data.net.DynamicProxySelector
 import app.dudebooru.data.posts.ArtistAvatars
 import app.dudebooru.data.posts.Downloader
@@ -32,10 +36,18 @@ class AppContainer(app: Application) {
 
     private val proxySelector = DynamicProxySelector()
 
+    /** Клиент без своего DNS — через него DoH-резолвер ходит к серверу DNS. */
+    private val bootstrapClient: OkHttpClient by lazy {
+        OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).proxySelector(proxySelector).build()
+    }
+
+    private val dns = DynamicDns { bootstrapClient }
+
     private val baseClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .proxySelector(proxySelector)
+        .dns(dns)
         .build()
 
     val userAgent = "DudeBooru/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; booru client)"
@@ -63,7 +75,20 @@ class AppContainer(app: Application) {
 
     val downloader = Downloader(app) { imageClient }
 
+    val collections = CollectionsRepository(app, db, registry, accounts, settings)
+
+    val downloads = DownloadRepository(app, db, settings)
+
+    val subscriptions = SubscriptionRepository(db.subscriptions(), registry, accounts, settings, negative)
+
     init {
+        SubscriptionRepository.schedulePeriodic(app)
+        scope.launch {
+            settings.doh.distinctUntilChanged().collect { provider ->
+                dns.use(provider)
+                http.client.connectionPool.evictAll()
+            }
+        }
         scope.launch {
             settings.proxy.distinctUntilChanged().collect { config ->
                 proxySelector.config = config

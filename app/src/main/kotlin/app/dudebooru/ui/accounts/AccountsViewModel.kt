@@ -9,9 +9,13 @@ import app.dudebooru.booru.net.BooruException
 import app.dudebooru.booru.site.EngineType
 import app.dudebooru.booru.site.SiteConfig
 import app.dudebooru.data.account.StoredAccount
+import app.dudebooru.data.net.DohProvider
 import app.dudebooru.data.net.ProxyConfig
 import app.dudebooru.data.settings.CensorPrefs
+import app.dudebooru.data.settings.DownloadPrefs
 import app.dudebooru.data.settings.FeedPrefs
+import app.dudebooru.data.settings.Profile
+import app.dudebooru.data.settings.SyncPrefs
 import app.dudebooru.ui.common.errorText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,6 +67,56 @@ class AccountsViewModel(app: Application, private val c: AppContainer) : Android
         viewModelScope.launch { c.settings.setShowHiddenCount(value) }
     }
 
+    val syncPrefs: StateFlow<SyncPrefs> = c.settings.syncPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, SyncPrefs())
+    val downloadPrefs: StateFlow<DownloadPrefs> = c.settings.downloadPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, DownloadPrefs())
+    val profile: StateFlow<Profile?> = c.settings.profile.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val doh: StateFlow<DohProvider> =
+        c.settings.doh.stateIn(viewModelScope, SharingStarted.Eagerly, DohProvider.NONE)
+
+    fun setDoh(value: DohProvider) {
+        viewModelScope.launch { c.settings.setDoh(value) }
+    }
+
+    fun setSyncPrefs(value: SyncPrefs) {
+        viewModelScope.launch { c.settings.setSyncPrefs(value) }
+    }
+
+    fun setDownloadPrefs(value: DownloadPrefs) {
+        viewModelScope.launch { c.settings.setDownloadPrefs(value) }
+    }
+
+    fun setProfile(name: String, nick: String) {
+        viewModelScope.launch { c.settings.setProfile(name, nick) }
+    }
+
+    /** Аватарка из галереи: копия в файлы приложения, чтобы не зависеть от доступа к исходнику. */
+    fun setAvatarFromGallery(uri: android.net.Uri) {
+        viewModelScope.launch {
+            val app = getApplication<android.app.Application>()
+            val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val target = java.io.File(app.filesDir, "avatar_${System.currentTimeMillis()}.img")
+                app.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use { input.copyTo(it) } }
+                app.filesDir.listFiles { f -> f.name.startsWith("avatar_") && f != target }?.forEach { it.delete() }
+                target
+            }
+            c.settings.setAvatar(android.net.Uri.fromFile(file).toString())
+        }
+    }
+
+    fun resetAvatar() {
+        viewModelScope.launch { c.settings.setAvatar(null) }
+    }
+
+    /** Пример поста для предпросмотра шаблона имени — последний сохранённый в базе или выдуманный. */
+    fun samplePost(): app.dudebooru.booru.model.Post = app.dudebooru.booru.model.Post(
+        site = "danbooru", id = 12271217, md5 = "2422b16fa3c5059d86d95307c14d7ac0", createdAt = 0,
+        rating = app.dudebooru.booru.model.Rating.GENERAL, width = 1516, height = 2048, fileExt = "jpg",
+        tags = app.dudebooru.booru.model.PostTags(
+            artist = listOf("moyangahdid"), character = listOf("ikari_shinji"), copyright = listOf("neon_genesis_evangelion"),
+        ),
+    )
+
     fun sharedWith(site: SiteConfig): List<SiteConfig> = c.registry.sitesInGroup(site.accountGroup).filter { it.id != site.id }
 
     fun edit(site: SiteConfig, transform: (LoginForm) -> LoginForm) {
@@ -83,6 +137,13 @@ class AccountsViewModel(app: Application, private val c: AppContainer) : Android
                 c.accounts.login(site, form.login, form.secret)
                 // Секрет не держим в памяти формы дольше, чем нужно.
                 edit(site) { LoginForm() }
+                // Первый вход: избранное с сайта переезжает в «Сохранённые».
+                if (c.settings.syncPrefsNow().syncSaved) {
+                    val imported = runCatching { c.collections.importFavorites(site) }.getOrDefault(0)
+                    if (imported > 0) {
+                        android.widget.Toast.makeText(context, context.getString(R.string.import_favorites_done, imported), android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: BooruException.InvalidCredentials) {

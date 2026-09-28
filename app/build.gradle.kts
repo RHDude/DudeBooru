@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.media3.okhttp)
     implementation(libs.androidx.work)
+    implementation(libs.okhttp.doh)
     implementation(libs.androidx.documentfile)
 
     testImplementation(libs.junit)

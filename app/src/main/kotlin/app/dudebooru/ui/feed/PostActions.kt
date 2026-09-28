@@ -30,6 +30,9 @@ interface PostActions {
     /** Вернуть негативный тег (из «скрыто N»). */
     fun restoreTag(expression: String)
 
+    /** Пост показан в просмотре — в «Историю». */
+    fun viewed(post: Post)
+
     /** Снять цензуру с одного поста. */
     fun reveal(post: Post)
 
@@ -48,3 +51,6 @@ data class Collections(val liked: Set<String> = emptySet(), val saved: Set<Strin
 val LocalCollections = staticCompositionLocalOf { Collections() }
 
 val LocalFeedPrefs = staticCompositionLocalOf { app.dudebooru.data.settings.FeedPrefs() }
+
+/** md5 уже скачанного — отметка в ленте. */
+val LocalDownloaded = staticCompositionLocalOf { emptySet<String>() }

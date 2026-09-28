@@ -59,6 +59,8 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
     val censor by vm.censor.collectAsStateWithLifecycle()
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     val savedCount by vm.savedCount.collectAsStateWithLifecycle()
+    val artistsNew by vm.artistsWithNew.collectAsStateWithLifecycle()
+    val downloadProgress by vm.downloadProgress.collectAsStateWithLifecycle()
     var accountsOpen by rememberSaveable { mutableStateOf(false) }
 
     ModalDrawerSheet(drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) {
@@ -156,14 +158,20 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
             }
             Spacer(Modifier.height(6.dp))
 
-            DrawerItem(DudeIcons.User, R.string.drawer_profile) { onNavigate(Route.Soon(R.string.drawer_profile, 4)) }
+            DrawerItem(DudeIcons.User, R.string.drawer_profile) { onNavigate(Route.Profile) }
             DrawerItem(DudeIcons.Spark, R.string.drawer_recommendations) { onNavigate(Route.Soon(R.string.drawer_recommendations, 5)) }
             DrawerItem(DudeIcons.Save, R.string.drawer_saved, badge = savedCount.takeIf { it > 0 }?.toString()) {
-                onNavigate(Route.Soon(R.string.drawer_saved, 4))
+                onNavigate(Route.Saved)
             }
-            DrawerItem(DudeIcons.Users, R.string.drawer_artists) { onNavigate(Route.Soon(R.string.drawer_artists, 4)) }
-            DrawerItem(DudeIcons.Download, R.string.drawer_downloads) { onNavigate(Route.Soon(R.string.drawer_downloads, 4)) }
-            DrawerItem(DudeIcons.History, R.string.drawer_history) { onNavigate(Route.Soon(R.string.drawer_history, 4)) }
+            DrawerItem(DudeIcons.Users, R.string.drawer_artists, badge = artistsNew.takeIf { it > 0 }?.toString(), highlight = true) {
+                onNavigate(Route.Artists)
+            }
+            DrawerItem(
+                DudeIcons.Download,
+                R.string.drawer_downloads,
+                badge = downloadProgress?.let { (done, total) -> stringResource(R.string.dl_progress, done, total) },
+            ) { onNavigate(Route.Downloads) }
+            DrawerItem(DudeIcons.History, R.string.drawer_history) { onNavigate(Route.History) }
             HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 6.dp))
             DrawerItem(DudeIcons.Shuffle, R.string.drawer_random) { vm.openRandom()?.let(onNavigate) }
             DrawerItem(DudeIcons.Hide, R.string.drawer_negative_tags) { onNavigate(Route.NegativeTags) }
@@ -176,11 +184,19 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
 }
 
 @Composable
-private fun DrawerItem(icon: ImageVector, label: Int, badge: String? = null, onClick: () -> Unit) {
+private fun DrawerItem(icon: ImageVector, label: Int, badge: String? = null, highlight: Boolean = false, onClick: () -> Unit) {
     NavigationDrawerItem(
         icon = { Icon(icon, null) },
         label = { Text(stringResource(label)) },
-        badge = badge?.let { { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+        badge = badge?.let {
+            {
+                if (highlight) {
+                    app.dudebooru.ui.main.CountBadge(it, highlighted = true)
+                } else {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
         selected = false,
         onClick = onClick,
         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding).height(48.dp),
