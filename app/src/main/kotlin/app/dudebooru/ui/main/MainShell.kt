@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -121,7 +124,11 @@ fun MainShell(vm: MainViewModel, actions: PostActions, dark: Boolean, onCloseApp
                     onHide = vm::hideFolder,
                     onMove = vm::moveFolder,
                 )
-                FolderPager(vm, folders, site, actions)
+                Box(Modifier.fillMaxSize()) {
+                    FolderPager(vm, folders, site, actions)
+                    // Пейджер на первой папке забирает жест растяжением — у края ловим его сами.
+                    EdgeSwipe(onOpen = { scope.launch { drawer.open() } }, modifier = Modifier.align(Alignment.CenterStart))
+                }
             }
         }
     }
@@ -205,6 +212,30 @@ private fun FolderChips(
             }
         }
     }
+}
+
+@Composable
+private fun EdgeSwipe(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val threshold = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
+    Box(
+        modifier
+            .fillMaxHeight()
+            .width(20.dp)
+            .pointerInput(Unit) {
+                var dragged = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { dragged = 0f },
+                    onHorizontalDrag = { change, amount ->
+                        dragged += amount
+                        change.consume()
+                        if (dragged > threshold) {
+                            dragged = Float.NEGATIVE_INFINITY
+                            onOpen()
+                        }
+                    },
+                )
+            },
+    )
 }
 
 @Composable

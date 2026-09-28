@@ -12,6 +12,7 @@ import app.dudebooru.booru.model.ContentMode
 import app.dudebooru.booru.model.SortOrder
 import app.dudebooru.booru.net.BooruJson
 import app.dudebooru.booru.site.Sites
+import app.dudebooru.data.net.DohProvider
 import app.dudebooru.data.net.ProxyConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -283,6 +284,14 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         }
     }
 
+    val doh: Flow<DohProvider> = store.data.map { prefs ->
+        prefs[DOH]?.let { runCatching { DohProvider.valueOf(it) }.getOrNull() } ?: DohProvider.NONE
+    }
+
+    suspend fun setDoh(provider: DohProvider) {
+        store.edit { it[DOH] = provider.name }
+    }
+
     private fun sortKey(siteId: String) = stringPreferencesKey("sort.$siteId")
 
     private companion object {
@@ -314,6 +323,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val SYNC_SAVED = androidx.datastore.preferences.core.booleanPreferencesKey("sync_saved")
         val MIRROR_LIKES = androidx.datastore.preferences.core.booleanPreferencesKey("mirror_likes")
         val KEEP_HISTORY = androidx.datastore.preferences.core.booleanPreferencesKey("keep_history")
+        val DOH = stringPreferencesKey("doh")
 
         const val DEFAULT_NAME = "Чувак"
         const val DEFAULT_NICK = "dude"

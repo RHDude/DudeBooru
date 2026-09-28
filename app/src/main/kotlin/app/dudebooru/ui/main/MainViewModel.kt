@@ -12,8 +12,12 @@ import app.dudebooru.booru.model.Post
 import app.dudebooru.booru.model.SortOrder
 import app.dudebooru.booru.site.SiteConfig
 import app.dudebooru.data.account.StoredAccount
-import app.dudebooru.data.db.LikeEntity
-import app.dudebooru.data.db.SavedEntity
+import app.dudebooru.booru.net.BooruJson
+import app.dudebooru.data.db.DownloadEntity
+import app.dudebooru.data.db.DownloadStatus
+import app.dudebooru.data.db.PostEntity
+import app.dudebooru.data.db.ViewHistoryEntity
+import kotlinx.coroutines.flow.Flow
 import app.dudebooru.data.settings.CensorPrefs
 import app.dudebooru.data.settings.FeedPrefs
 import app.dudebooru.data.settings.Profile
@@ -96,6 +100,10 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
     private val savedSorts = HashMap<String, SortOrder>()
 
     init {
+        viewModelScope.launch {
+            // Новые работы у подписок — сразу при запуске, дальше раз в 6 часов в фоне.
+            runCatching { c.subscriptions.checkAll() }
+        }
         viewModelScope.launch {
             _visitMarks.value = c.settings.lastSeen.first()
             c.registry.sites.forEach { savedSorts[it.id] = c.settings.sort(it.id).first() }
@@ -286,23 +294,55 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
     // --- лайки и сохранённые (синхронизация с сайтом — шаг «коллекции») -----------------------
 
     fun toggleLike(post: Post) {
-        viewModelScope.launch {
-            val dao = c.db.collections()
-            if (post.key in liked.value) dao.unlike(post.site, post.id) else dao.like(LikeEntity(post.site, post.id, System.currentTimeMillis()))
-        }
+        viewModelScope.launch { c.collections.setLiked(post, post.key !in liked.value) }
     }
 
     /** Двойной тап только ставит лайк, не снимает. */
     fun like(post: Post) {
         if (post.key in liked.value) return
-        viewModelScope.launch { c.db.collections().like(LikeEntity(post.site, post.id, System.currentTimeMillis())) }
+        viewModelScope.launch { c.collections.setLiked(post, true) }
     }
 
     fun toggleSave(post: Post) {
-        viewModelScope.launch {
-            val dao = c.db.collections()
-            if (post.key in saved.value) dao.unsave(post.site, post.id) else dao.save(SavedEntity(post.site, post.id, System.currentTimeMillis()))
-        }
+        viewModelScope.launch { c.collections.setSaved(post, post.key !in saved.value) }
+    }
+
+    // --- шаг «коллекции» ---------------------------------------------------------------------
+
+    val likeCount: StateFlow<Int> = c.db.collections().likeCount().stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    /** md5 скачанного: отметка в ленте, повторно не качается. */
+    val downloadedMd5: StateFlow<Set<String>> = c.downloads.doneMd5.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    val downloads: StateFlow<List<DownloadEntity>> = c.downloads.all.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** «2 из 5» прямо в пункте меню: готово / всего в текущей пачке, пока она не закончилась. */
+    val downloadProgress: StateFlow<Pair<Int, Int>?> = c.downloads.all.map { list ->
+        val active = list.filter { it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.PAUSED }
+        if (active.isEmpty()) return@map null
+        val batchStart = active.minOf { it.createdAt }
+        val batch = list.filter { it.createdAt >= batchStart }
+        batch.count { it.status == DownloadStatus.DONE } to batch.size
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val artistsWithNew: StateFlow<Int> = c.subscriptions.withNew.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    private val keepHistory: StateFlow<Boolean> = c.settings.keepHistory.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** Просмотренный пост — в «Историю» (если её ведут). */
+    fun recordView(post: Post) {
+        if (!keepHistory.value) return
+        viewModelScope.launch { c.db.history().upsert(ViewHistoryEntity(post.site, post.id, System.currentTimeMillis())) }
+    }
+
+    /** Лента из базы: «Сохранённые», лайки, история. */
+    fun localFeed(id: String, source: Flow<List<Post>>): FeedController = controllers.getOrPut(id) {
+        val site = c.registry.sites.first()
+        FeedController(id, site, c, viewModelScope, emptyList(), SortOrder.NEW, { mode.value }, localSource = source)
+    }
+
+    fun decodePosts(entities: Flow<List<PostEntity>>): Flow<List<Post>> = entities.map { list ->
+        list.mapNotNull { runCatching { BooruJson.decodeFromString(Post.serializer(), it.json) }.getOrNull() }
     }
 
     val savedCount: StateFlow<Int> = c.db.collections().savedCount().stateIn(viewModelScope, SharingStarted.Eagerly, 0)

@@ -11,5 +11,10 @@ sealed interface Route {
     data class Artist(val controllerId: String, val siteId: String, val name: String) : Route
     data object Settings : Route
     data object NegativeTags : Route
+    data object Saved : Route
+    data object Profile : Route
+    data object History : Route
+    data object Artists : Route
+    data object Downloads : Route
     data class Soon(@StringRes val title: Int, val step: Int) : Route
 }

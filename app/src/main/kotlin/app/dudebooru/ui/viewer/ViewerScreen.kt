@@ -129,6 +129,7 @@ fun ViewerScreen(
         }
 
         val current = slots.getOrNull(pager.currentPage) ?: slots.last()
+        LaunchedEffect(current.post.key) { actions.viewed(current.post) }
 
         Box(
             Modifier

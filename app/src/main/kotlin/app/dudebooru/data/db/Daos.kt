@@ -113,6 +113,12 @@ interface SearchHistoryDao {
     @Query("SELECT * FROM search_history WHERE site = :site ORDER BY pinned DESC, usedAt DESC LIMIT :limit")
     fun recent(site: String, limit: Int = 30): Flow<List<SearchHistoryEntity>>
 
+    @Query("SELECT * FROM search_history ORDER BY usedAt DESC LIMIT :limit")
+    fun recentAll(limit: Int = 200): Flow<List<SearchHistoryEntity>>
+
+    @Query("DELETE FROM search_history")
+    suspend fun clear()
+
     @Query("SELECT * FROM search_history WHERE site = :site AND query = :query")
     suspend fun get(site: String, query: String): SearchHistoryEntity?
 

@@ -32,6 +32,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -89,14 +95,33 @@ fun ArtistScreen(vm: MainViewModel, controller: FeedController, name: String, ac
     val info by produceState<ArtistInfo?>(null, controller.site.id, name) {
         value = runCatching { vm.c.registry.engine(controller.site).artist(name, vm.c.accounts.session(controller.site)) }.getOrNull()
     }
+    val scope = rememberCoroutineScope()
+    val subscribed by remember(controller.site.id, name) { vm.c.subscriptions.isSubscribed(controller.site, name) }.collectAsStateWithLifecycle(false)
+    val newest = feed.items.maxOfOrNull { item -> item.posts.maxOf { it.id } } ?: 0L
+    // Страница открыта — новые работы просмотрены.
+    LaunchedEffect(subscribed, newest, sort) {
+        if (subscribed && sort == SortOrder.NEW && newest > 0) vm.c.subscriptions.markSeen(controller.site, name, newest)
+    }
+    var bulk by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(DudeIcons.Back, stringResource(R.string.back)) } },
                 title = { Text(controller.site.name) },
+                actions = {
+                    if (feed.items.isNotEmpty()) {
+                        IconButton(onClick = { bulk = true }) { Icon(DudeIcons.Download, stringResource(R.string.artist_download_all)) }
+                    }
+                },
             )
         },
     ) { padding ->
+        if (bulk) {
+            app.dudebooru.ui.collections.BulkDownloadDialog(controller.posts, onDismiss = { bulk = false }) {
+                bulk = false
+                actions.downloadAll(controller.posts)
+            }
+        }
         // На странице художника сетка по умолчанию.
         FeedList(controller, actions, modifier = Modifier.padding(padding), grid = true) {
             run {
@@ -128,6 +153,18 @@ fun ArtistScreen(vm: MainViewModel, controller: FeedController, name: String, ac
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                    // Подписка: новые работы попадают в «Художники» со счётчиком.
+                    if (subscribed) {
+                        OutlinedButton(onClick = { scope.launch { vm.c.subscriptions.unsubscribe(controller.site, name) } }, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.artist_unsubscribe))
+                        }
+                    } else {
+                        androidx.compose.material3.Button(
+                            onClick = { scope.launch { vm.c.subscriptions.subscribe(controller.site, name, newest) } },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.artist_subscribe)) }
+                    }
+                    Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val options = listOf(SortOrder.NEW to R.string.artist_new, SortOrder.BEST to R.string.artist_best)
                         SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {

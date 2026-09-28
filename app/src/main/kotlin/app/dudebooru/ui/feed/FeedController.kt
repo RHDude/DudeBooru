@@ -66,6 +66,8 @@ class FeedController(
     initialSort: SortOrder,
     private val mode: () -> ContentMode,
     private val onSortChanged: (SortOrder) -> Unit = {},
+    /** Лента из базы («Сохранённые», лайки, история): без сети и без догрузки семей. */
+    private val localSource: kotlinx.coroutines.flow.Flow<List<Post>>? = null,
 ) {
     private val _state = MutableStateFlow(FeedState())
     val state: StateFlow<FeedState> = _state.asStateFlow()
@@ -81,6 +83,18 @@ class FeedController(
     private var job: Job? = null
     private val familyRequested = HashSet<Long>()
 
+    val isLocal: Boolean get() = localSource != null
+
+    init {
+        if (localSource != null) {
+            scope.launch {
+                localSource.collect { posts ->
+                    _state.value = FeedState(items = posts.map { FeedItem(listOf(it)) }, endReached = true)
+                }
+            }
+        }
+    }
+
     /** Все картинки ленты подряд — для просмотра: сначала вся карусель, потом следующий пост. */
     val posts: List<Post> get() = _state.value.items.flatMap { it.posts }
 
@@ -92,6 +106,7 @@ class FeedController(
     }
 
     fun ensureLoaded() {
+        if (localSource != null) return
         val s = _state.value
         if (s.key != currentKey() || (s.items.isEmpty() && !s.loading && s.error == null && !s.endReached)) load(reset = true)
     }
@@ -105,6 +120,7 @@ class FeedController(
     private fun currentKey() = FeedKey(site.id, mode(), _sort.value, tags)
 
     private fun load(reset: Boolean, pull: Boolean = false) {
+        if (localSource != null) return
         val before = _state.value
         if (!reset && (before.loading || before.endReached || before.items.isEmpty())) return
         val key = currentKey()
@@ -185,12 +201,14 @@ class FeedController(
      * одним запросом `parent:ID`, когда карточка появляется на экране.
      */
     fun ensureFamily(item: FeedItem) {
+        if (localSource != null) return
         val root = PostGrouper.familyRoot(item.posts) ?: return
         if (!familyRequested.add(root)) return
         scope.launch {
             val family = runCatching {
                 withContext(Dispatchers.IO) {
-                    c.registry.engine(site).family(root, mode(), c.accounts.session(site))
+                    val postSite = c.registry.site(item.lead.site) ?: site
+                    c.registry.engine(postSite).family(root, mode(), c.accounts.session(postSite))
                 }
             }.getOrNull().orEmpty()
             val blacklist = c.negative.blacklist.value

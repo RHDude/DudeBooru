@@ -98,7 +98,7 @@ fun PostMenuButton(post: Post, group: List<Post>, actions: PostActions, tint: Co
     }
     // Меню привязано к самой кнопке ⋮, а не к строке, в которой она стоит.
     Box {
-        IconButton(onClick = { open = true }) { Icon(DudeIcons.Dots, stringResource(R.string.menu), tint = tint) }
+        IconButton(onClick = { open = true }) { Icon(DudeIcons.Dots, stringResource(R.string.post_actions), tint = tint) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             val close = { open = false }
             val lightHint = formatSize(post.lightSize)

@@ -66,6 +66,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dudebooru.R
 import app.dudebooru.booru.engine.QueryPlan
+import app.dudebooru.booru.model.Post
+import androidx.compose.foundation.combinedClickable
 import app.dudebooru.booru.net.BooruException
 import app.dudebooru.ui.common.errorText
 import kotlinx.coroutines.delay
@@ -83,6 +85,8 @@ fun FeedList(
     showPlan: Boolean = false,
     grid: Boolean = LocalFeedPrefs.current.grid,
     visitMark: Long? = null,
+    /** Долгое нажатие в сетке; по умолчанию — «скачать оригинал». */
+    onLongPress: ((Post) -> Unit)? = null,
     /** Только у видимой папки: верх ленты на экране — новое просмотрено. */
     onTopSeen: ((Long) -> Unit)? = null,
     header: (@Composable () -> Unit)? = null,
@@ -161,7 +165,11 @@ fun FeedList(
                 }
                 gridItems(state.items, key = { it.key }) { item ->
                     LaunchedEffect(item.key) { controller.ensureFamily(item) }
-                    GridCell(item) { actions.open(controller, item.lead) }
+                    GridCell(
+                        item = item,
+                        onClick = { actions.open(controller, item.lead) },
+                        onLongClick = { onLongPress?.invoke(item.lead) ?: actions.download(item.lead, original = true) },
+                    )
                 }
                 item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { Footer(state, controller, context) }
             }
@@ -242,7 +250,7 @@ private fun Footer(state: FeedState, controller: FeedController, context: androi
                 }
             }
             state.endReached && state.items.isEmpty() -> EmptyFeed()
-            state.endReached -> Text(stringResource(R.string.feed_end), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            state.endReached && !controller.isLocal -> Text(stringResource(R.string.feed_end), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -284,10 +292,19 @@ private fun NewDivider() {
 }
 
 /** Клетка сетки: квадратное превью; у карусели — отметка с числом картинок. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun GridCell(item: FeedItem, onClick: () -> Unit) {
+private fun GridCell(item: FeedItem, onClick: () -> Unit, onLongClick: () -> Unit) {
     val context = LocalContext.current
-    Box(Modifier.aspectRatio(1f).background(placeholderColor(item.lead)).clickable(onClick = onClick)) {
+    val censor = LocalCensor.current
+    Box(
+        Modifier.aspectRatio(1f).background(placeholderColor(item.lead))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+    ) {
+        if (censor.hides(item.lead)) {
+            CensoredImage(item.lead, censor.prefs.style, censor.prefs.strength, onReveal = onClick)
+            return@Box
+        }
         coil3.compose.AsyncImage(
             model = coil3.request.ImageRequest.Builder(context).data(item.lead.previewUrl ?: item.lead.sampleUrl).build(),
             contentDescription = null,
