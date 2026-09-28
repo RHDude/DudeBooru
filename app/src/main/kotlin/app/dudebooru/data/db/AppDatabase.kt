@@ -26,10 +26,11 @@ import androidx.room.RoomDatabase
         DislikeEntity::class,
         MutedTagEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     // С версии 3 — только миграции: обновление не должно стирать лайки и сохранённые.
-    autoMigrations = [AutoMigration(from = 3, to = 4)],
+    // 5: колокольчик у подписок (notify, notifiedId).
+    autoMigrations = [AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun posts(): PostDao

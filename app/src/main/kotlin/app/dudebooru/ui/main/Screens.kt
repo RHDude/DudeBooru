@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -97,7 +98,9 @@ fun ArtistScreen(vm: MainViewModel, controller: FeedController, name: String, ac
         value = runCatching { vm.c.registry.engine(controller.site).artist(name, vm.c.accounts.session(controller.site)) }.getOrNull()
     }
     val scope = rememberCoroutineScope()
-    val subscribed by remember(controller.site.id, name) { vm.c.subscriptions.isSubscribed(controller.site, name) }.collectAsStateWithLifecycle(false)
+    val subscription by remember(controller.site.id, name) { vm.c.subscriptions.observe(controller.site, name) }.collectAsStateWithLifecycle(null)
+    val subscribed = subscription != null
+    var confirmUnsubscribe by remember { mutableStateOf(false) }
     val newest = feed.items.maxOfOrNull { item -> item.posts.maxOf { it.id } } ?: 0L
     // Страница открыта — новые работы просмотрены.
     LaunchedEffect(subscribed, newest, sort) {
@@ -166,16 +169,57 @@ fun ArtistScreen(vm: MainViewModel, controller: FeedController, name: String, ac
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    // Подписка: новые работы попадают в «Художники» со счётчиком.
-                    if (subscribed) {
-                        OutlinedButton(onClick = { scope.launch { vm.c.subscriptions.unsubscribe(controller.site, name) } }, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.artist_unsubscribe))
+                    // Подписка, как в Twitter: «Подписаться» / «Подписан», рядом колокольчик —
+                    // уведомления о новых работах можно выключить у одного художника, не отписываясь.
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val sub = subscription
+                        if (sub != null) {
+                            androidx.compose.material3.OutlinedIconButton(onClick = {
+                                val enable = !sub.notify
+                                if (enable) actions.askNotifications()
+                                scope.launch { vm.c.subscriptions.setNotify(controller.site, name, enable) }
+                                android.widget.Toast.makeText(
+                                    context,
+                                    context.getString(if (enable) R.string.artist_notify_enabled else R.string.artist_notify_disabled, name),
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }) {
+                                Icon(
+                                    if (sub.notify) DudeIcons.BellRing else DudeIcons.BellOff,
+                                    stringResource(if (sub.notify) R.string.artist_notify_on else R.string.artist_notify_off),
+                                    tint = if (sub.notify) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            androidx.compose.material3.FilledTonalButton(onClick = { confirmUnsubscribe = true }, modifier = Modifier.weight(1f)) {
+                                Icon(DudeIcons.Check, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.artist_subscribed))
+                            }
+                        } else {
+                            androidx.compose.material3.Button(
+                                onClick = {
+                                    actions.askNotifications()
+                                    scope.launch { vm.c.subscriptions.subscribe(controller.site, name, newest) }
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) { Text(stringResource(R.string.artist_subscribe)) }
                         }
-                    } else {
-                        androidx.compose.material3.Button(
-                            onClick = { scope.launch { vm.c.subscriptions.subscribe(controller.site, name, newest) } },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.artist_subscribe)) }
+                    }
+                    if (confirmUnsubscribe) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { confirmUnsubscribe = false },
+                            title = { Text(stringResource(R.string.artist_unsubscribe_title, name)) },
+                            text = { Text(stringResource(R.string.artist_unsubscribe_text)) },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    confirmUnsubscribe = false
+                                    scope.launch { vm.c.subscriptions.unsubscribe(controller.site, name) }
+                                }) { Text(stringResource(R.string.artist_unsubscribe)) }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(onClick = { confirmUnsubscribe = false }) { Text(stringResource(R.string.cancel)) }
+                            },
+                        )
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {

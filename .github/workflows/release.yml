@@ -1,0 +1,136 @@
+name: Release
+
+# Выпуск в GitHub Releases.
+#
+# 1. Коммит с «[release]» в сообщении собирает release APK версии из app/build.gradle.kts.
+#    Есть секрет DUDEBOORU_SIGNING_KEY (закрытый ключ P-256 в hex или PEM) — APK подписывается
+#    здесь же и сразу выходит выпуск.
+#    Секрета нет — ключ остаётся у владельца: сборка печатает хеш содержимого APK (в summary),
+#    неподписанный APK сохраняется артефактом «unsigned-apk».
+# 2. Владелец подписывает хеш своим ключом (.github/scripts/apk_v2.py signed-data + openssl)
+#    и кладёт .github/release/signatures/<версия>.json: run_id сборки, commit, signature.
+#    Коммит с «[publish]» вставляет подпись в APK из артефакта, apksigner проверяет — выходит выпуск.
+#
+# Сертификат подписи (открытая часть) — .github/release/signing-cert.pem.
+on:
+  push:
+    branches: ['**']
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  CERT: .github/release/signing-cert.pem
+
+jobs:
+  build:
+    if: contains(github.event.head_commit.message, '[release]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      SIGNING_KEY: ${{ secrets.DUDEBOORU_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Android SDK
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" "platforms;android-37" > /dev/null || echo "::notice::platform 37 will be installed by AGP"
+
+      - name: Version
+        id: version
+        run: |
+          version=$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "DudeBooru $version"
+
+      - name: Build
+        run: ./gradlew --stacktrace :booru:test :app:assembleRelease
+
+      - name: Unsigned APK
+        run: |
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          echo "BUILD_TOOLS=$bt" >> "$GITHUB_ENV"
+          src=app/build/outputs/apk/release/app-release-unsigned.apk
+          if "$bt/zipalign" -c -P 16 4 "$src" > /dev/null; then cp "$src" unsigned.apk; else "$bt/zipalign" -f -P 16 4 "$src" unsigned.apk; fi
+          ls -l unsigned.apk
+
+      - name: Sign with the repository secret
+        if: env.SIGNING_KEY != ''
+        run: |
+          python3 .github/scripts/apk_v2.py keystore "$SIGNING_KEY" "$CERT" release.p12
+          "$BUILD_TOOLS/apksigner" sign --ks release.p12 --ks-pass pass:dudebooru --ks-key-alias dudebooru \
+            --min-sdk-version 26 --out "DudeBooru-${{ steps.version.outputs.version }}.apk" unsigned.apk
+          rm release.p12
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs --min-sdk-version 26 "DudeBooru-${{ steps.version.outputs.version }}.apk"
+
+      - name: Content digest for the owner's key
+        if: env.SIGNING_KEY == ''
+        run: |
+          digest=$(python3 .github/scripts/apk_v2.py digest unsigned.apk)
+          {
+            echo "### DudeBooru ${{ steps.version.outputs.version }}: waiting for the signature"
+            echo
+            echo "- run_id: ${{ github.run_id }}"
+            echo "- commit: ${{ github.sha }}"
+            echo "- digest: $digest"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-apk
+          path: unsigned.apk
+          retention-days: 30
+
+      - name: Publish
+        if: env.SIGNING_KEY != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/publish.sh "${{ steps.version.outputs.version }}" "DudeBooru-${{ steps.version.outputs.version }}.apk" "${{ github.sha }}"
+
+  publish:
+    if: contains(github.event.head_commit.message, '[publish]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Signature
+        id: sig
+        run: |
+          version=$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)
+          file=".github/release/signatures/$version.json"
+          if [ ! -f "$file" ]; then echo "::error::$file not found"; exit 1; fi
+          test "$(jq -r .version "$file")" = "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "run_id=$(jq -r .run_id "$file")" >> "$GITHUB_OUTPUT"
+          echo "commit=$(jq -r .commit "$file")" >> "$GITHUB_OUTPUT"
+          jq -r .signature "$file" > signature.hex
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: unsigned-apk
+          run-id: ${{ steps.sig.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Assemble and verify
+        run: |
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          apk="DudeBooru-${{ steps.sig.outputs.version }}.apk"
+          python3 .github/scripts/apk_v2.py assemble unsigned.apk "$CERT" "$(cat signature.hex)" "$apk"
+          "$bt/apksigner" verify --verbose --print-certs --min-sdk-version 26 "$apk"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/publish.sh "${{ steps.sig.outputs.version }}" "DudeBooru-${{ steps.sig.outputs.version }}.apk" "${{ steps.sig.outputs.commit }}"

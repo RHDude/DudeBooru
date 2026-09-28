@@ -77,12 +77,24 @@ import kotlin.system.exitProcess
 /** Файл темы из чужого приложения ждёт, пока соберётся интерфейс. */
 private val incomingTheme = kotlinx.coroutines.flow.MutableStateFlow<android.net.Uri?>(null)
 
+/** Куда вести по тапу на уведомление. */
+private sealed interface OpenRequest {
+    data class Artist(val site: String, val name: String) : OpenRequest
+    data object Artists : OpenRequest
+    data object Update : OpenRequest
+}
+
+private val incomingOpen = kotlinx.coroutines.flow.MutableStateFlow<OpenRequest?>(null)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val app = application as DudeApp
-        if (savedInstanceState == null) takeThemeIntent(intent)
+        if (savedInstanceState == null) {
+            takeThemeIntent(intent)
+            takeOpenIntent(intent)
+        }
         setContent {
             val vm = viewModel { MainViewModel(app, app.container) }
             val themeMode by vm.themeMode.collectAsStateWithLifecycle()
@@ -102,6 +114,17 @@ class MainActivity : ComponentActivity() {
                 vm.effectiveDark(systemDark, java.time.ZonedDateTime.now())
             }
             val reveal = remember { ThemeReveal() }
+            // Холодный старт (сплэш) — в теме приложения, а не системы: Android 12+ запоминает её сам.
+            LaunchedEffect(themeMode, dark) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    val mode = when {
+                        themeMode == ThemeMode.SYSTEM -> android.app.UiModeManager.MODE_NIGHT_AUTO
+                        dark -> android.app.UiModeManager.MODE_NIGHT_YES
+                        else -> android.app.UiModeManager.MODE_NIGHT_NO
+                    }
+                    runCatching { getSystemService(android.app.UiModeManager::class.java)?.setApplicationNightMode(mode) }
+                }
+            }
             LaunchedEffect(dark) {
                 val transparent = AndroidColor.TRANSPARENT
                 val style = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
@@ -141,6 +164,21 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         takeThemeIntent(intent)
+        takeOpenIntent(intent)
+    }
+
+    /** Тап по уведомлению: новые работы художника, сводка по художникам или новая версия. */
+    private fun takeOpenIntent(intent: android.content.Intent?) {
+        incomingOpen.value = when (intent?.action) {
+            app.dudebooru.notify.Notifications.ACTION_OPEN_ARTIST -> {
+                val site = intent.getStringExtra(app.dudebooru.notify.Notifications.EXTRA_SITE)
+                val name = intent.getStringExtra(app.dudebooru.notify.Notifications.EXTRA_ARTIST)
+                if (site != null && name != null) OpenRequest.Artist(site, name) else OpenRequest.Artists
+            }
+            app.dudebooru.notify.Notifications.ACTION_OPEN_ARTISTS -> OpenRequest.Artists
+            app.dudebooru.notify.Notifications.ACTION_SHOW_UPDATE -> OpenRequest.Update
+            else -> return
+        }
     }
 
     /** Файл темы, открытый из Telegram или файлового менеджера, сразу предлагает применить тему. */
@@ -192,6 +230,7 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
         LocalCensor provides CensorState(censorOn, mode, censorPrefs, revealed),
         LocalDownloaded provides downloaded,
         app.dudebooru.ui.feed.LocalFeedEnv provides actions,
+        app.dudebooru.ui.common.LocalSharedKey provides vm.sharedKey,
     ) {
         Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
             BackHandler { if (!vm.back()) activity?.finish() }
@@ -204,8 +243,10 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                         if (reduced) {
                             androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
                         } else {
-                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) togetherWith
-                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(180))
+                            // Новый экран проявляется поверх, старый гаснет, когда его уже почти не видно:
+                            // без «провала» через фон, пока оба экрана полупрозрачные.
+                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) togetherWith
+                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120, delayMillis = 160))
                         }
                     },
                     label = "routes",
@@ -267,6 +308,8 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                                 onOpenThemes = { vm.navigate(Route.Themes) },
                                 onOpenIcons = { vm.navigate(Route.IconPicker) },
                                 onOpenGame = { vm.navigate(Route.Game) },
+                                updates = vm.updates,
+                                onAskNotifications = actions::askNotifications,
                             )
                         }
                         Route.NegativeTags -> NegativeTagsScreen(vm, onBack = { vm.back() })
@@ -296,6 +339,18 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
             }
             NotInterestedSheet(actions)
             AdultDialog(vm)
+            app.dudebooru.ui.update.UpdateDialog(vm.updates)
+            // Тап по уведомлению: к художнику, в «Художники» или в окно обновления.
+            val open by incomingOpen.collectAsStateWithLifecycle()
+            LaunchedEffect(open) {
+                when (val request = open) {
+                    is OpenRequest.Artist -> if (vm.c.registry.site(request.site) != null) vm.openArtist(request.site, request.name)
+                    OpenRequest.Artists -> vm.navigate(Route.Artists)
+                    OpenRequest.Update -> vm.updates.openDialog()
+                    null -> return@LaunchedEffect
+                }
+                incomingOpen.value = null
+            }
         }
     }
 }

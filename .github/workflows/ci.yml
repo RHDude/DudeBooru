@@ -1,0 +1,69 @@
+name: CI
+
+# Сборка и тесты на каждый пуш: модуль booru на JVM, приложение — debug и release (R8).
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**.md'
+      - '.github/release/**'
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Android SDK
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" "platforms;android-37" > /dev/null || echo "::notice::platform 37 will be installed by AGP"
+
+      - name: Build and test
+        run: ./gradlew --stacktrace :booru:test :app:assembleDebug :app:assembleRelease
+
+      # Room пишет схему базы при сборке; новую версию нужно положить в репозиторий.
+      - name: Room schemas
+        if: always()
+        run: |
+          changed=$( (git ls-files --others --exclude-standard app/schemas; git diff --name-only app/schemas) | sort -u)
+          if [ -n "$changed" ]; then
+            echo "::warning::Room schema changed — commit these files"
+            for f in $changed; do echo "::group::$f"; cat "$f"; echo; echo "::endgroup::"; done
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dudebooru-debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: room-schemas
+          path: app/schemas
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: reports
+          path: |
+            app/build/reports
+            booru/build/reports
+          retention-days: 7

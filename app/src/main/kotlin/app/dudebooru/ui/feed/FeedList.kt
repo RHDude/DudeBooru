@@ -248,7 +248,7 @@ fun FeedList(
                 modifier = Modifier.clip(RoundedCornerShape(50)).clickable { scope.launch { listState.animateScrollToItem(0) } },
             ) {
                 Text(
-                    stringResource(R.string.feed_new_button, newCount),
+                    androidx.compose.ui.res.pluralStringResource(R.plurals.feed_new_button, newCount, newCount),
                     color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

@@ -24,21 +24,47 @@ class SearchViewModel(private val c: AppContainer, val site: SiteConfig) : ViewM
 
     private var job: Job? = null
 
-    fun onInput(word: String) {
+    /**
+     * Подсказки для набранного текста: сначала для всей фразы через «_» («hatsune mi» → hatsune_mi…),
+     * потом для последнего слова — это может быть уже следующий тег.
+     */
+    fun onInput(text: String) {
         job?.cancel()
-        val prefix = word.trim().removePrefix("-").removePrefix("~").replace(' ', '_').lowercase()
-        if (prefix.isEmpty()) {
+        val words = words(text)
+        val last = words.lastOrNull()?.trimStart('-', '~')?.lowercase().orEmpty()
+        val phrase = if (words.size > 1) words.joinToString("_") { it.trimStart('-', '~') }.lowercase() else null
+        if (last.isEmpty()) {
             _suggestions.value = emptyList()
             return
         }
         job = viewModelScope.launch {
-            val local = c.tags.localSuggestions(site, prefix, 12)
+            val local = (phrase?.let { c.tags.localSuggestions(site, it, 6) }.orEmpty() + c.tags.localSuggestions(site, last, 12))
+                .distinctBy { it.name }
             _suggestions.value = local
             delay(250)
-            val remote = runCatching { c.tags.remoteSuggestions(site, prefix, 12) }.getOrDefault(emptyList())
+            val remote = runCatching {
+                phrase?.let { c.tags.remoteSuggestions(site, it, 6) }.orEmpty() + c.tags.remoteSuggestions(site, last, 12)
+            }.getOrDefault(emptyList())
             if (remote.isNotEmpty()) _suggestions.value = (remote + local).distinctBy { it.name }.take(15)
         }
     }
+
+    /**
+     * Нажали подсказку: что из набранного становится чипами. Подсказка для всей фразы заменяет её целиком;
+     * подсказка для последнего слова заменяет только его, а слова перед ним остаются своими тегами —
+     * раньше они терялись, и поиск по двум тегам шёл по одному.
+     */
+    suspend fun accept(text: String, tag: String): List<String> {
+        val words = words(text)
+        if (words.isEmpty()) return listOf(tag)
+        val phrase = words.joinToString("_") { it.trimStart('-', '~') }.lowercase()
+        if (words.size > 1 && tag.startsWith(phrase)) return listOf(sign(words.first()) + tag)
+        return normalize(words.dropLast(1).joinToString(" ")) + (sign(words.last()) + tag)
+    }
+
+    private fun words(text: String): List<String> = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+
+    private fun sign(word: String): String = word.takeWhile { it == '-' || it == '~' }
 
     /**
      * Свободный текст → теги. «hatsune miku» целиком становится `hatsune_miku`, если такой тег есть;

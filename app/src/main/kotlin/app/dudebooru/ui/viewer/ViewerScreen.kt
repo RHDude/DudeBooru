@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -69,9 +70,12 @@ import app.dudebooru.R
 import app.dudebooru.booru.model.MediaType
 import app.dudebooru.booru.model.Post
 import app.dudebooru.booru.model.TagCategory
+import app.dudebooru.ui.common.errorText
 import app.dudebooru.ui.common.postDate
+import app.dudebooru.ui.feed.ActionPill
 import app.dudebooru.ui.feed.CensoredImage
 import app.dudebooru.ui.feed.FeedController
+import app.dudebooru.ui.feed.FeedState
 import app.dudebooru.ui.feed.LocalCensor
 import app.dudebooru.ui.feed.LikeRed
 import app.dudebooru.ui.feed.LocalCollections
@@ -113,7 +117,8 @@ fun ViewerScreen(
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (slots.isEmpty()) {
-            if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
+            // «Случайный пост» и открытые заранее ленты: пока ничего нет — загрузка или понятная ошибка, не чёрный экран.
+            ViewerPlaceholder(state, controller, onClose)
             return@Box
         }
         val start = remember { slots.indexOfFirst { it.post.key == startKey }.coerceAtLeast(0) }
@@ -131,7 +136,12 @@ fun ViewerScreen(
         }
 
         val current = slots.getOrNull(pager.currentPage) ?: slots.last()
-        LaunchedEffect(current.post.key) { actions.viewed(current.post) }
+        val sharedKey = app.dudebooru.ui.common.LocalSharedKey.current
+        LaunchedEffect(current.post.key) {
+            actions.viewed(current.post)
+            // Назад в ленту картинка улетит в карточку того поста, что сейчас на экране.
+            sharedKey.value = current.post.key
+        }
 
         Box(
             Modifier
@@ -189,22 +199,38 @@ fun ViewerScreen(
 
         AnimatedVisibility(barsVisible, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
             val collections = LocalCollections.current
+            // Те же кнопки, что под постом в ленте; «детали» — рядом с лайком.
             Row(
-                Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).navigationBarsPadding().padding(horizontal = 4.dp),
+                Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).navigationBarsPadding()
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                val pill = Color.White.copy(alpha = 0.14f)
                 val liked = current.post.key in collections.liked
-                IconButton(onClick = { actions.toggleLike(current.post) }) {
-                    Icon(if (liked) DudeIcons.HeartFilled else DudeIcons.Heart, stringResource(R.string.action_like), tint = if (liked) LikeRed else Color.White)
-                }
+                ActionPill(
+                    icon = if (liked) DudeIcons.HeartFilled else DudeIcons.Heart,
+                    contentDescription = stringResource(R.string.action_like),
+                    onClick = { actions.toggleLike(current.post) },
+                    active = liked,
+                    activeColor = LikeRed,
+                    tint = Color.White,
+                    container = pill,
+                    bounce = true,
+                )
+                ActionPill(DudeIcons.ChevronUp, stringResource(R.string.viewer_details), onClick = { detailsFor = current.post }, tint = Color.White, container = pill)
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = { detailsFor = current.post }) { Icon(DudeIcons.ChevronUp, stringResource(R.string.viewer_details), tint = Color.White) }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { actions.share(current.post) }) { Icon(DudeIcons.Share, stringResource(R.string.action_share), tint = Color.White) }
+                ActionPill(DudeIcons.Share, stringResource(R.string.action_share), onClick = { actions.share(current.post) }, tint = Color.White, container = pill)
                 val saved = current.post.key in collections.saved
-                IconButton(onClick = { actions.toggleSave(current.post) }) {
-                    Icon(if (saved) DudeIcons.SaveFilled else DudeIcons.Save, stringResource(R.string.action_save), tint = Color.White)
-                }
+                ActionPill(
+                    icon = if (saved) DudeIcons.SaveFilled else DudeIcons.Save,
+                    contentDescription = stringResource(R.string.action_save),
+                    onClick = { actions.toggleSave(current.post) },
+                    active = saved,
+                    activeColor = Color.White,
+                    tint = Color.White,
+                    container = pill,
+                )
             }
         }
 
@@ -215,6 +241,48 @@ fun ViewerScreen(
                 onSearchTag(post, tag, add)
             })
         }
+    }
+}
+
+/** Просмотр без картинок: идёт загрузка, сайт ответил ошибкой или ничего не нашлось. */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.ViewerPlaceholder(state: FeedState, controller: FeedController, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val error = state.error
+    Column(
+        Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        when {
+            state.loading || (error == null && !state.endReached) -> {
+                CircularProgressIndicator(color = Color.White)
+                Spacer(Modifier.height(20.dp))
+                app.dudebooru.ui.face.SlowLoadingHint(controller.site.name)
+            }
+            error != null -> {
+                Text(
+                    app.dudebooru.ui.face.rememberKaomoji(app.dudebooru.ui.face.Kaomoji.SAD),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(context.errorText(error), color = Color.White, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                androidx.compose.material3.OutlinedButton(onClick = controller::retry) { Text(stringResource(R.string.retry), color = Color.White) }
+            }
+            else -> {
+                Text(
+                    app.dudebooru.ui.face.rememberKaomoji(app.dudebooru.ui.face.Kaomoji.CONFUSED),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(stringResource(R.string.feed_empty), color = Color.White, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+            }
+        }
+    }
+    IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(4.dp)) {
+        Icon(DudeIcons.Back, stringResource(R.string.back), tint = Color.White)
     }
 }
 

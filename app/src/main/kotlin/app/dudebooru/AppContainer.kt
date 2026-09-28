@@ -22,6 +22,8 @@ import app.dudebooru.data.secure.SecretStore
 import app.dudebooru.data.settings.SettingsRepository
 import app.dudebooru.data.settings.settingsStore
 import app.dudebooru.data.tags.TagDictionary
+import app.dudebooru.data.update.Updates
+import app.dudebooru.notify.Notifications
 import app.dudebooru.util.DudeLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -90,8 +92,12 @@ class AppContainer(app: Application) {
 
     val subscriptions = SubscriptionRepository(db.subscriptions(), registry, accounts, settings, negative)
 
+    val updates = Updates(app) { imageClient }
+
     init {
         SubscriptionRepository.schedulePeriodic(app)
+        Updates.schedulePeriodic(app)
+        Notifications.ensureChannels(app)
         scope.launch {
             settings.doh.distinctUntilChanged().collect { provider ->
                 dns.use(provider)

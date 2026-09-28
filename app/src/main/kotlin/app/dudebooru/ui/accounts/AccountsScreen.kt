@@ -39,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -55,6 +56,7 @@ import app.dudebooru.data.settings.DownloadPrefs
 import app.dudebooru.data.settings.FeedPrefs
 import app.dudebooru.data.settings.SyncPrefs
 import app.dudebooru.ui.icons.DudeIcons
+import kotlin.math.roundToInt
 
 @Composable
 fun AccountsScreen(
@@ -64,6 +66,8 @@ fun AccountsScreen(
     onOpenThemes: () -> Unit = {},
     onOpenIcons: () -> Unit = {},
     onOpenGame: () -> Unit = {},
+    updates: app.dudebooru.ui.update.UpdateController? = null,
+    onAskNotifications: () -> Unit = {},
 ) {
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     val forms by vm.forms.collectAsStateWithLifecycle()
@@ -101,6 +105,22 @@ fun AccountsScreen(
                 ContentCard(censorEnabled, censorPrefs, showHidden, vm::setCensorEnabled, vm::setCensorPrefs, vm::setShowHiddenCount, onOpenNegativeTags)
             }
             item(key = "feed") { FeedCard(feedPrefs, vm::setFeedPrefs) }
+            item(key = "notifications") {
+                val artists by vm.notifyArtists.collectAsStateWithLifecycle()
+                val releases by vm.notifyUpdates.collectAsStateWithLifecycle()
+                NotificationsCard(
+                    artists = artists,
+                    releases = releases,
+                    onArtists = {
+                        if (it) onAskNotifications()
+                        vm.setNotifyArtists(it)
+                    },
+                    onReleases = {
+                        if (it) onAskNotifications()
+                        vm.setNotifyUpdates(it)
+                    },
+                )
+            }
             item(key = "look") { LookCard(onOpenThemes, onOpenIcons) }
             item {
                 Text(
@@ -125,7 +145,7 @@ fun AccountsScreen(
                 val doh by vm.doh.collectAsStateWithLifecycle()
                 DohCard(doh, vm::setDoh)
             }
-            item(key = "about") { AboutCard(onOpenGame) }
+            item(key = "about") { AboutCard(onOpenGame, updates) }
         }
     }
 }
@@ -317,8 +337,19 @@ private fun ContentCard(
                         }
                     }
                 }
+                // Ползунок откликается сразу: значение живёт здесь, в настройки уходит, когда палец отпущен.
+                var strength by remember(prefs.strength) { androidx.compose.runtime.mutableFloatStateOf(prefs.strength) }
+                app.dudebooru.ui.feed.CensorPreview(
+                    style = prefs.style,
+                    strength = strength,
+                    modifier = Modifier.fillMaxWidth().height(120.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
+                )
                 Text(stringResource(R.string.censor_strength), style = MaterialTheme.typography.bodySmall)
-                androidx.compose.material3.Slider(value = prefs.strength, onValueChange = { onPrefs(prefs.copy(strength = it)) })
+                androidx.compose.material3.Slider(
+                    value = strength,
+                    onValueChange = { strength = it },
+                    onValueChangeFinished = { onPrefs(prefs.copy(strength = strength)) },
+                )
                 SwitchRow(stringResource(R.string.censor_in_viewer), prefs.inViewer) { onPrefs(prefs.copy(inViewer = it)) }
                 SwitchRow(stringResource(R.string.censor_sensitive), prefs.blurSensitive) { onPrefs(prefs.copy(blurSensitive = it)) }
             }
@@ -353,7 +384,14 @@ private fun ProfileCard(vm: AccountsViewModel) {
                 }
             }
             Text(stringResource(R.string.profile_avatar_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.profile_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.profile_name)) },
+                placeholder = { Text(stringResource(R.string.profile_default_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
             OutlinedTextField(value = nick, onValueChange = { nick = it.removePrefix("@") }, label = { Text(stringResource(R.string.profile_nick)) }, prefix = { Text("@") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Button(onClick = { vm.setProfile(name, nick) }, enabled = name != profile?.name || nick != profile?.nick) { Text(stringResource(R.string.save)) }
         }
@@ -418,10 +456,12 @@ private fun DownloadsCard(vm: AccountsViewModel, prefs: DownloadPrefs, onChange:
             }
             SwitchRow(stringResource(R.string.dl_wifi_only), prefs.wifiOnly) { onChange(prefs.copy(wifiOnly = it)) }
             SwitchRow(stringResource(R.string.dl_write_tags), prefs.writeTags) { onChange(prefs.copy(writeTags = it)) }
-            Text(stringResource(R.string.dl_parallel, prefs.parallel), style = MaterialTheme.typography.bodyMedium)
+            var parallel by remember(prefs.parallel) { androidx.compose.runtime.mutableFloatStateOf(prefs.parallel.toFloat()) }
+            Text(stringResource(R.string.dl_parallel, parallel.roundToInt()), style = MaterialTheme.typography.bodyMedium)
             androidx.compose.material3.Slider(
-                value = prefs.parallel.toFloat(),
-                onValueChange = { onChange(prefs.copy(parallel = it.toInt().coerceIn(1, 4))) },
+                value = parallel,
+                onValueChange = { parallel = it },
+                onValueChangeFinished = { onChange(prefs.copy(parallel = parallel.roundToInt().coerceIn(1, 4))) },
                 valueRange = 1f..4f,
                 steps = 2,
             )
@@ -484,11 +524,40 @@ private fun LookCard(onOpenThemes: () -> Unit, onOpenIcons: () -> Unit) {
     }
 }
 
-/** О приложении: версия; семь тапов по ней открывают игру. */
+/**
+ * Настройки → Уведомления: новые работы у подписок и новые версии.
+ * Колокольчик на странице художника выключает уведомления только от него.
+ */
 @Composable
-private fun AboutCard(onOpenGame: () -> Unit) {
+private fun NotificationsCard(artists: Boolean, releases: Boolean, onArtists: (Boolean) -> Unit, onReleases: (Boolean) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.settings_notifications), style = MaterialTheme.typography.titleMedium)
+            SwitchRow(stringResource(R.string.notify_artists_switch), artists, onArtists)
+            Text(stringResource(R.string.notify_artists_switch_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (app.dudebooru.BuildConfig.UPDATE_CHECK) {
+                SwitchRow(stringResource(R.string.notify_updates_switch), releases, onReleases)
+            }
+            androidx.compose.material3.TextButton(onClick = {
+                val intent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                } else {
+                    android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:${context.packageName}"))
+                }
+                runCatching { context.startActivity(intent) }
+            }) { Text(stringResource(R.string.notify_system_settings)) }
+        }
+    }
+}
+
+/** О приложении: версия (семь тапов по ней открывают игру), что нового, проверка обновлений. */
+@Composable
+private fun AboutCard(onOpenGame: () -> Unit, updates: app.dudebooru.ui.update.UpdateController?) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var taps by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var whatsNew by rememberSaveable { mutableStateOf(false) }
     androidx.compose.material3.ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
@@ -507,6 +576,39 @@ private fun AboutCard(onOpenGame: () -> Unit) {
                     }
                 }.padding(vertical = 6.dp),
             )
+            androidx.compose.material3.TextButton(onClick = { whatsNew = !whatsNew }, contentPadding = PaddingValues(0.dp)) {
+                Text(stringResource(R.string.about_whats_new, app.dudebooru.BuildConfig.VERSION_NAME))
+            }
+            androidx.compose.animation.AnimatedVisibility(whatsNew) {
+                Text(stringResource(R.string.whats_new), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
+            }
+            if (updates != null && app.dudebooru.BuildConfig.UPDATE_CHECK) {
+                val state by updates.state.collectAsStateWithLifecycle()
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = { updates.check() },
+                        enabled = state !is app.dudebooru.ui.update.UpdateState.Checking && state !is app.dudebooru.ui.update.UpdateState.Downloading,
+                    ) { Text(stringResource(R.string.update_check)) }
+                    if (state is app.dudebooru.ui.update.UpdateState.Checking) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+                val status = when (val s = state) {
+                    app.dudebooru.ui.update.UpdateState.UpToDate -> stringResource(R.string.update_up_to_date)
+                    is app.dudebooru.ui.update.UpdateState.Available -> stringResource(R.string.update_available_title, s.release.version)
+                    is app.dudebooru.ui.update.UpdateState.Downloading -> stringResource(R.string.update_downloading)
+                    is app.dudebooru.ui.update.UpdateState.Failed -> s.message
+                    else -> null
+                }
+                status?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state is app.dudebooru.ui.update.UpdateState.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp).then(
+                            if (state is app.dudebooru.ui.update.UpdateState.Available) Modifier.clickable { updates.openDialog() } else Modifier,
+                        ),
+                    )
+                }
+            }
         }
     }
 }

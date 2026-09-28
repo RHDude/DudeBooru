@@ -5,6 +5,18 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+/**
+ * Ключ релизной подписи: из переменных окружения (сборка в GitHub Actions) или из keystore.properties
+ * в корне проекта (локальная сборка; файл и сам ключ в git не попадают). Нет ключа — release собирается
+ * неподписанным, подпись ставится отдельно (см. .github/workflows/release.yml).
+ */
+val keystoreProperties = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
+    java.util.Properties().apply { file.inputStream().use { load(it) } }
+}
+
+fun signingValue(env: String, property: String): String? =
+    providers.environmentVariable(env).orNull?.takeIf { it.isNotBlank() } ?: keystoreProperties?.getProperty(property)
+
 android {
     namespace = "app.dudebooru"
     compileSdk = 37
@@ -13,8 +25,28 @@ android {
         applicationId = "app.dudebooru"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // major * 10000 + minor * 100 + patch
+        versionCode = 900
+        versionName = "0.9.0"
+        // Проверка обновлений через GitHub Releases; для F-Droid выключается: ./gradlew -PnoUpdateCheck
+        buildConfigField("boolean", "UPDATE_CHECK", (!providers.gradleProperty("noUpdateCheck").isPresent).toString())
+    }
+
+    androidResources {
+        // Язык приложения выбирается и в системных настройках (Android 13+): английский и русский.
+        generateLocaleConfig = true
+    }
+
+    signingConfigs {
+        create("release") {
+            val store = signingValue("DUDEBOORU_KEYSTORE", "storeFile")
+            if (store != null) {
+                storeFile = rootProject.file(store)
+                storePassword = signingValue("DUDEBOORU_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("DUDEBOORU_KEY_ALIAS", "keyAlias")
+                keyPassword = signingValue("DUDEBOORU_KEY_PASSWORD", "keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -26,6 +58,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
         }
     }
 

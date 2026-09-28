@@ -138,7 +138,7 @@ fun MiniMainPreview(modifier: Modifier = Modifier) {
                 Spacer(Modifier.width(5.dp))
                 Column {
                     MiniText("artist_name", 6.5, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
-                    MiniText("24 сентября в 22:32", 5, color = scheme.onSurfaceVariant)
+                    MiniText(androidx.compose.ui.res.stringResource(app.dudebooru.R.string.preview_post_date), 5, color = scheme.onSurfaceVariant)
                 }
             }
             Box(

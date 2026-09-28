@@ -1,5 +1,6 @@
 package app.dudebooru.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -116,6 +117,10 @@ data class SubscriptionEntity(
     val lastSeenId: Long,
     val newCount: Int = 0,
     val checkedAt: Long = 0,
+    /** Колокольчик на странице художника: присылать ли уведомления о новых работах. */
+    @ColumnInfo(defaultValue = "1") val notify: Boolean = true,
+    /** Самая новая работа, о которой уже было уведомление, — чтобы не присылать его дважды. */
+    @ColumnInfo(defaultValue = "0") val notifiedId: Long = 0,
 )
 
 /** Папки внутри «Сохранённых», как favorite groups на Danbooru. */

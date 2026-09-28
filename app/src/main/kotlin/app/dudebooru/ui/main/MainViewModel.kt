@@ -29,6 +29,7 @@ import app.dudebooru.ui.theme.ThemeFiles
 import app.dudebooru.ui.feed.CustomChunk
 import app.dudebooru.ui.feed.FeedController
 import app.dudebooru.ui.feed.FeedItem
+import app.dudebooru.ui.update.UpdateController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -106,17 +107,23 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
     /** Навигация: главный экран всегда внизу стека. */
     val stack = mutableStateListOf<Route>(Route.Main)
 
+    /** Пост, картинка которого перелетает между лентой и просмотром (см. [app.dudebooru.ui.common.sharedPost]). */
+    val sharedKey = androidx.compose.runtime.mutableStateOf<String?>(null)
+
+    /** Обновления из GitHub Releases: «О приложении», пункт в меню, окно «Вышла версия». Объявлено до init: он его вызывает. */
+    val updates = UpdateController(app, c, viewModelScope)
+
     private val controllers = HashMap<String, FeedController>()
-    private val savedSorts = HashMap<String, SortOrder>()
 
     init {
         viewModelScope.launch {
             // Новые работы у подписок — сразу при запуске, дальше раз в 6 часов в фоне.
-            runCatching { c.subscriptions.checkAll() }
+            // Приложение открыто: хватает счётчика в меню, уведомление о тех же работах потом не придёт.
+            runCatching { c.subscriptions.checkAll().forEach { c.subscriptions.markNotified(it) } }
         }
+        updates.checkOnStart()
         viewModelScope.launch {
             _visitMarks.value = c.settings.lastSeen.first()
-            c.registry.sites.forEach { savedSorts[it.id] = c.settings.sort(it.id).first() }
             val last = c.settings.lastSite()
             val visible = folders.first { it.isNotEmpty() }
             select(visible.firstOrNull { it.id == last }?.id ?: visible.first().id)
@@ -183,7 +190,9 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
             c = c,
             scope = viewModelScope,
             tags = emptyList(),
-            initialSort = savedSorts[siteId] ?: SortOrder.NEW,
+            // Сортировка читается сразу: папку могут создать раньше, чем дочитаются настройки
+            // (счётчики новых, смена режима), и тогда выбор сбрасывался бы на «Новое».
+            initialSort = c.settings.sort(siteId).now(),
             mode = { mode.value },
             onSortChanged = { sort -> viewModelScope.launch { c.settings.setSort(siteId, sort) } },
         )
@@ -218,18 +227,46 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
         navigate(Route.Artist(id, siteId, name))
     }
 
+    /** Случайная подборка, загруженная заранее — пока открыто боковое меню. */
+    private var randomReady: FeedController? = null
+    private var randomSeq = 0
+
+    private fun newRandom(siteId: String): FeedController = FeedController(
+        id = "random:$siteId:${++randomSeq}",
+        site = requireNotNull(c.registry.site(siteId)),
+        c = c,
+        scope = viewModelScope,
+        tags = emptyList(),
+        initialSort = SortOrder.RANDOM,
+        mode = { mode.value },
+        pageSize = 20,
+        minVisible = 1,
+    )
+
+    private fun FeedController.usableFor(siteId: String): Boolean {
+        val s = state.value
+        return site.id == siteId && s.error == null && s.key?.mode == this@MainViewModel.mode.value
+    }
+
+    /** Меню открыли — готовим случайный пост, чтобы по тапу он показался сразу. */
+    fun warmRandom() {
+        val siteId = _selected.value ?: return
+        if (randomReady?.usableFor(siteId) == true) return
+        randomReady = newRandom(siteId).also { it.ensureLoaded() }
+    }
+
     /**
-     * Случайная работа из текущего источника с учётом режима (и негативных тегов — шаг «фильтры»).
+     * Случайная работа из текущего источника с учётом режима и негативных тегов.
      * Открывается просмотр; свайп — следующий случайный.
      */
     fun openRandom(): Route? {
         val siteId = _selected.value ?: return null
-        val id = "random:$siteId"
-        controllers.remove(id)
-        val controller = FeedController(id, requireNotNull(c.registry.site(siteId)), c, viewModelScope, emptyList(), SortOrder.RANDOM, { mode.value })
-        controllers[id] = controller
-        controller.ensureLoaded()
-        return Route.Viewer(id, startKey = "")
+        val controller = randomReady?.takeIf { it.usableFor(siteId) } ?: newRandom(siteId).also { it.ensureLoaded() }
+        randomReady = null
+        // Прошлые случайные подборки больше не нужны: «Случайный пост» открывается только с главного экрана.
+        controllers.keys.removeAll { it.startsWith("random:") }
+        controllers[controller.id] = controller
+        return Route.Viewer(controller.id, startKey = "")
     }
 
     /** Новые с прошлого визита: посты свежее последнего увиденного, до 99. */

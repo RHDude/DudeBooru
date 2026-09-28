@@ -74,17 +74,23 @@ fun Context.artistLabel(post: Post): String {
 fun Context.postDate(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault(), today: LocalDate = LocalDate.now(zone)): String {
     if (epochMillis <= 0) return ""
     // Месяцы — на языке интерфейса, а не системы: иначе «24 September в 22:32».
-    val locale = Locale.forLanguageTag(getString(R.string.date_locale))
+    val locale = getString(R.string.date_locale)
     val dateTime = Instant.ofEpochMilli(epochMillis).atZone(zone)
     val date = dateTime.toLocalDate()
-    val time = dateTime.format(DateTimeFormatter.ofPattern("HH:mm", locale))
+    val time = dateTime.format(formatter("HH:mm", locale))
     return when {
         date == today -> getString(R.string.date_today, time)
         date == today.minusDays(1) -> getString(R.string.date_yesterday, time)
-        date.year == today.year -> getString(R.string.date_this_year, dateTime.format(DateTimeFormatter.ofPattern("d MMMM", locale)), time)
-        else -> dateTime.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale))
+        date.year == today.year -> getString(R.string.date_this_year, dateTime.format(formatter(getString(R.string.date_pattern_day_month), locale)), time)
+        else -> dateTime.format(formatter(getString(R.string.date_pattern_full), locale))
     }
 }
+
+/** Форматтеры дат — один раз на шаблон: дата считается у каждой карточки при прокрутке. */
+private val formatters = java.util.concurrent.ConcurrentHashMap<String, DateTimeFormatter>()
+
+private fun formatter(pattern: String, locale: String): DateTimeFormatter =
+    formatters.getOrPut("$locale|$pattern") { DateTimeFormatter.ofPattern(pattern, Locale.forLanguageTag(locale)) }
 
 /** Расстояние Левенштейна — для «может, тег пишется иначе?». */
 fun editDistance(a: String, b: String): Int {

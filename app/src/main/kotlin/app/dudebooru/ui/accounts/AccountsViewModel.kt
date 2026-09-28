@@ -78,6 +78,17 @@ class AccountsViewModel(app: Application, private val c: AppContainer) : Android
         viewModelScope.launch { c.settings.setDoh(value) }
     }
 
+    val notifyArtists: StateFlow<Boolean> = c.settings.notifyArtists.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val notifyUpdates: StateFlow<Boolean> = c.settings.notifyUpdates.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setNotifyArtists(value: Boolean) {
+        viewModelScope.launch { c.settings.setNotifyArtists(value) }
+    }
+
+    fun setNotifyUpdates(value: Boolean) {
+        viewModelScope.launch { c.settings.setNotifyUpdates(value) }
+    }
+
     fun setSyncPrefs(value: SyncPrefs) {
         viewModelScope.launch { c.settings.setSyncPrefs(value) }
     }
