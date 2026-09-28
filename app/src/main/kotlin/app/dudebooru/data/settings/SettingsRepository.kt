@@ -25,7 +25,8 @@ data class FolderSettings(
     val hidden: Set<String>,
 )
 
-enum class ThemeMode { SYSTEM, LIGHT, DARK }
+/** Светлая или тёмная: как в системе, вручную, по расписанию или по закату и рассвету. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK, SCHEDULE, SUNSET }
 
 /** Настройки → Скачивание. */
 data class DownloadPrefs(
@@ -288,6 +289,63 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         prefs[DOH]?.let { runCatching { DohProvider.valueOf(it) }.getOrNull() } ?: DohProvider.NONE
     }
 
+    /** Пресет темы или «custom». */
+    val themeId: Flow<String> = store.data.map { it[THEME_ID] ?: "monet" }
+
+    suspend fun setThemeId(id: String) {
+        store.edit { it[THEME_ID] = id }
+    }
+
+    val customTheme: Flow<app.dudebooru.ui.theme.AppTheme?> = store.data.map { prefs ->
+        prefs[CUSTOM_THEME]?.let { runCatching { BooruJson.decodeFromString(app.dudebooru.ui.theme.AppTheme.serializer(), it) }.getOrNull() }
+    }
+
+    suspend fun setCustomTheme(theme: app.dudebooru.ui.theme.AppTheme) {
+        store.edit { it[CUSTOM_THEME] = BooruJson.encodeToString(app.dudebooru.ui.theme.AppTheme.serializer(), theme) }
+    }
+
+    /** Расписание ночи в минутах от полуночи (по умолчанию 22:00–07:00). */
+    val nightSchedule: Flow<Pair<Int, Int>> = store.data.map { (it[NIGHT_START] ?: 22 * 60) to (it[NIGHT_END] ?: 7 * 60) }
+
+    suspend fun setNightSchedule(start: Int, end: Int) {
+        store.edit {
+            it[NIGHT_START] = start
+            it[NIGHT_END] = end
+        }
+    }
+
+    /** Ручное переключение при расписании/закате действует до следующей смены. */
+    val nightOverride: Flow<Pair<Boolean, Long>?> = store.data.map { prefs ->
+        val until = prefs[OVERRIDE_UNTIL] ?: return@map null
+        (prefs[OVERRIDE_DARK] ?: false) to until
+    }
+
+    suspend fun setNightOverride(dark: Boolean?, until: Long) {
+        store.edit {
+            if (dark == null) {
+                it.remove(OVERRIDE_DARK)
+                it.remove(OVERRIDE_UNTIL)
+            } else {
+                it[OVERRIDE_DARK] = dark
+                it[OVERRIDE_UNTIL] = until
+            }
+        }
+    }
+
+    /** Первый запуск пройден. */
+    val onboarded: Flow<Boolean> = store.data.map { it[ONBOARDED] ?: false }
+
+    suspend fun setOnboarded() {
+        store.edit { it[ONBOARDED] = true }
+    }
+
+    /** Рекорд в игре без сети. */
+    val gameRecord: Flow<Int> = store.data.map { it[GAME_RECORD] ?: 0 }
+
+    suspend fun setGameRecord(value: Int) {
+        store.edit { prefs -> if ((prefs[GAME_RECORD] ?: 0) < value) prefs[GAME_RECORD] = value }
+    }
+
     /** Сколько было лайков, когда рекомендации открывали в последний раз — для метки «new». */
     val recsSeenLikes: Flow<Int> = store.data.map { it[RECS_SEEN] ?: 0 }
 
@@ -332,6 +390,14 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val KEEP_HISTORY = androidx.datastore.preferences.core.booleanPreferencesKey("keep_history")
         val DOH = stringPreferencesKey("doh")
         val RECS_SEEN = androidx.datastore.preferences.core.intPreferencesKey("recs_seen_likes")
+        val THEME_ID = stringPreferencesKey("theme_id")
+        val CUSTOM_THEME = stringPreferencesKey("custom_theme")
+        val NIGHT_START = androidx.datastore.preferences.core.intPreferencesKey("night_start")
+        val NIGHT_END = androidx.datastore.preferences.core.intPreferencesKey("night_end")
+        val OVERRIDE_DARK = androidx.datastore.preferences.core.booleanPreferencesKey("night_override_dark")
+        val OVERRIDE_UNTIL = longPreferencesKey("night_override_until")
+        val ONBOARDED = androidx.datastore.preferences.core.booleanPreferencesKey("onboarded")
+        val GAME_RECORD = androidx.datastore.preferences.core.intPreferencesKey("game_record")
 
         const val DEFAULT_NAME = "Чувак"
         const val DEFAULT_NICK = "dude"

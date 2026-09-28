@@ -36,6 +36,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -64,124 +67,141 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
     val downloadProgress by vm.downloadProgress.collectAsStateWithLifecycle()
     var accountsOpen by rememberSaveable { mutableStateOf(false) }
 
+    val look = app.dudebooru.ui.theme.LocalAppTheme.current
     ModalDrawerSheet(drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 12.dp)) {
-            // --- шапка ---
-            Box(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 20.dp, bottom = 8.dp)) {
-                Column {
-                    Avatar(profile?.avatarUrl, Modifier.size(64.dp).clickable { onNavigate(Route.Settings) })
-                    Spacer(Modifier.height(12.dp))
-                    Text(profile?.name.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Row(
-                        Modifier.fillMaxWidth().clickable { accountsOpen = !accountsOpen }.padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "@" + profile?.nick.orEmpty(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(if (accountsOpen) DudeIcons.ChevronUp else DudeIcons.ChevronDown, stringResource(R.string.drawer_accounts))
-                    }
-                }
-                // Солнце в тёмной теме, луна в светлой: иконка показывает, куда переключит.
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .combinedClickable(
-                            onClick = { vm.toggleTheme(dark) },
-                            onLongClick = { onNavigate(Route.Soon(R.string.drawer_themes, 6)) },
-                        ),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(if (dark) DudeIcons.Sun else DudeIcons.Moon, stringResource(R.string.drawer_toggle_theme), tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
+        Box {
+            // Фон меню из темы — тот же, что у ленты.
+            if (look.background.kind != app.dudebooru.ui.theme.ThemeBackground.Kind.NONE) {
+                app.dudebooru.ui.theme.ThemeBackdrop(look.background, Modifier.matchParentSize())
             }
-
-            // --- ▾ аккаунты сайтов ---
-            if (accountsOpen) {
-                Column(Modifier.padding(horizontal = 12.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                    vm.c.registry.sites.filter { it.supportsLogin }.distinctBy { it.accountGroup }.forEach { site ->
-                        val account = accounts[site.accountGroup]?.takeIf { !it.invalid }
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(site.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 12.dp)) {
+                // --- шапка ---
+                Box(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 20.dp, bottom = 8.dp)) {
+                    Column {
+                        Avatar(profile?.avatarUrl, Modifier.size(64.dp).clickable { onNavigate(Route.Settings) })
+                        Spacer(Modifier.height(12.dp))
+                        Text(profile?.name.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Row(
+                            Modifier.fillMaxWidth().clickable { accountsOpen = !accountsOpen }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
-                                account?.info?.login ?: stringResource(R.string.drawer_not_signed_in),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (account != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                "@" + profile?.nick.orEmpty(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(if (accountsOpen) DudeIcons.ChevronUp else DudeIcons.ChevronDown, stringResource(R.string.drawer_accounts))
+                        }
+                    }
+                    // Солнце в тёмной теме, луна в светлой: иконка показывает, куда переключит.
+                    val reveal = app.dudebooru.ui.theme.LocalThemeReveal.current
+                    val revealScope = androidx.compose.runtime.rememberCoroutineScope()
+                    var buttonCenter by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .onGloballyPositioned { buttonCenter = it.boundsInRoot().center }
+                            .combinedClickable(
+                                onClick = { revealScope.launch { reveal.run(buttonCenter) { vm.toggleTheme(dark) } } },
+                                onLongClick = { onNavigate(Route.Themes) },
+                            ),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(if (dark) DudeIcons.Sun else DudeIcons.Moon, stringResource(R.string.drawer_toggle_theme), tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+
+                // Кружево темы Maid под шапкой меню.
+                if (look.pattern == app.dudebooru.ui.theme.ThemePattern.LACE) {
+                    app.dudebooru.ui.face.LaceEdge(Modifier.fillMaxWidth().height(14.dp).padding(horizontal = 12.dp))
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // --- ▾ аккаунты сайтов ---
+                if (accountsOpen) {
+                    Column(Modifier.padding(horizontal = 12.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                        vm.c.registry.sites.filter { it.supportsLogin }.distinctBy { it.accountGroup }.forEach { site ->
+                            val account = accounts[site.accountGroup]?.takeIf { !it.invalid }
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(site.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    account?.info?.login ?: stringResource(R.string.drawer_not_signed_in),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (account != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().clickable { onNavigate(Route.Settings) }.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(DudeIcons.Plus, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text(stringResource(R.string.drawer_sign_in), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // --- быстрые переключатели: то, что чаще всего меняют ---
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
+                        ContentMode.entries.forEachIndexed { i, entry ->
+                            SegmentedButton(
+                                selected = entry == mode,
+                                onClick = { vm.setMode(entry) },
+                                shape = SegmentedButtonDefaults.itemShape(i, ContentMode.entries.size),
+                                icon = {},
+                            ) { Text(stringResource(entry.label()), style = MaterialTheme.typography.labelMedium) }
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (censor) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).clickable { vm.toggleCensor() },
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                if (censor) DudeIcons.Hide else DudeIcons.Eye,
+                                stringResource(if (censor) R.string.drawer_censor_on else R.string.drawer_censor_off),
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }
-                    Row(
-                        Modifier.fillMaxWidth().clickable { onNavigate(Route.Settings) }.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(DudeIcons.Plus, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text(stringResource(R.string.drawer_sign_in), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
-                    }
                 }
-                Spacer(Modifier.height(8.dp))
-            }
+                Spacer(Modifier.height(6.dp))
 
-            // --- быстрые переключатели: то, что чаще всего меняют ---
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
-                    ContentMode.entries.forEachIndexed { i, entry ->
-                        SegmentedButton(
-                            selected = entry == mode,
-                            onClick = { vm.setMode(entry) },
-                            shape = SegmentedButtonDefaults.itemShape(i, ContentMode.entries.size),
-                            icon = {},
-                        ) { Text(stringResource(entry.label()), style = MaterialTheme.typography.labelMedium) }
-                    }
+                DrawerItem(DudeIcons.User, R.string.drawer_profile) { onNavigate(Route.Profile) }
+                DrawerItem(DudeIcons.Spark, R.string.drawer_recommendations, badge = if (recsNew) "new" else null, highlight = true) {
+                    onNavigate(Route.Recs)
                 }
-                Spacer(Modifier.width(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (censor) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).clickable { vm.toggleCensor() },
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            if (censor) DudeIcons.Hide else DudeIcons.Eye,
-                            stringResource(if (censor) R.string.drawer_censor_on else R.string.drawer_censor_off),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                DrawerItem(DudeIcons.Save, R.string.drawer_saved, badge = savedCount.takeIf { it > 0 }?.toString()) {
+                    onNavigate(Route.Saved)
                 }
+                DrawerItem(DudeIcons.Users, R.string.drawer_artists, badge = artistsNew.takeIf { it > 0 }?.toString(), highlight = true) {
+                    onNavigate(Route.Artists)
+                }
+                DrawerItem(
+                    DudeIcons.Download,
+                    R.string.drawer_downloads,
+                    badge = downloadProgress?.let { (done, total) -> stringResource(R.string.dl_progress, done, total) },
+                ) { onNavigate(Route.Downloads) }
+                DrawerItem(DudeIcons.History, R.string.drawer_history) { onNavigate(Route.History) }
+                HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 6.dp))
+                DrawerItem(DudeIcons.Shuffle, R.string.drawer_random) { vm.openRandom()?.let(onNavigate) }
+                DrawerItem(DudeIcons.Hide, R.string.drawer_negative_tags) { onNavigate(Route.NegativeTags) }
+                HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 6.dp))
+                DrawerItem(DudeIcons.Palette, R.string.drawer_themes) { onNavigate(Route.Themes) }
+                DrawerItem(DudeIcons.Gear, R.string.drawer_settings) { onNavigate(Route.Settings) }
+                DrawerItem(DudeIcons.Off, R.string.drawer_close_app, onClick = onCloseApp)
             }
-            Spacer(Modifier.height(6.dp))
-
-            DrawerItem(DudeIcons.User, R.string.drawer_profile) { onNavigate(Route.Profile) }
-            DrawerItem(DudeIcons.Spark, R.string.drawer_recommendations, badge = if (recsNew) "new" else null, highlight = true) {
-                onNavigate(Route.Recs)
-            }
-            DrawerItem(DudeIcons.Save, R.string.drawer_saved, badge = savedCount.takeIf { it > 0 }?.toString()) {
-                onNavigate(Route.Saved)
-            }
-            DrawerItem(DudeIcons.Users, R.string.drawer_artists, badge = artistsNew.takeIf { it > 0 }?.toString(), highlight = true) {
-                onNavigate(Route.Artists)
-            }
-            DrawerItem(
-                DudeIcons.Download,
-                R.string.drawer_downloads,
-                badge = downloadProgress?.let { (done, total) -> stringResource(R.string.dl_progress, done, total) },
-            ) { onNavigate(Route.Downloads) }
-            DrawerItem(DudeIcons.History, R.string.drawer_history) { onNavigate(Route.History) }
-            HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 6.dp))
-            DrawerItem(DudeIcons.Shuffle, R.string.drawer_random) { vm.openRandom()?.let(onNavigate) }
-            DrawerItem(DudeIcons.Hide, R.string.drawer_negative_tags) { onNavigate(Route.NegativeTags) }
-            HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 6.dp))
-            DrawerItem(DudeIcons.Palette, R.string.drawer_themes) { onNavigate(Route.Soon(R.string.drawer_themes, 6)) }
-            DrawerItem(DudeIcons.Gear, R.string.drawer_settings) { onNavigate(Route.Settings) }
-            DrawerItem(DudeIcons.Off, R.string.drawer_close_app, onClick = onCloseApp)
         }
     }
 }

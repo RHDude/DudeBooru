@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Временная иконка до Дуди (шаг «лицо»): бирюзовый фон, белый тег с фиолетовой дыркой. -->
+<!-- Иконка по умолчанию — Дуди. Остальные включаются через activity-alias на экране выбора иконки. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/launcher_background" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
-    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+    <background android:drawable="@mipmap/ic_dudi_bg" />
+    <foreground android:drawable="@mipmap/ic_dudi_fg" />
+    <monochrome android:drawable="@mipmap/ic_dudi_mono" />
 </adaptive-icon>

@@ -85,3 +85,17 @@ fun Context.postDate(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault(), t
         else -> dateTime.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale))
     }
 }
+
+/** Расстояние Левенштейна — для «может, тег пишется иначе?». */
+fun editDistance(a: String, b: String): Int {
+    val prev = IntArray(b.length + 1) { it }
+    val cur = IntArray(b.length + 1)
+    for (i in 1..a.length) {
+        cur[0] = i
+        for (j in 1..b.length) {
+            cur[j] = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + if (a[i - 1] == b[j - 1]) 0 else 1)
+        }
+        cur.copyInto(prev)
+    }
+    return prev[b.length]
+}

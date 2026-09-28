@@ -55,6 +55,8 @@ data class FeedState(
     val hidden: Map<String, Int> = emptyMap(),
     /** Номер страницы для лент со своим источником. */
     val page: Int = 0,
+    /** Сети нет или сайт не ответил — показана сохранённая первая страница. */
+    val fromCache: Boolean = false,
 ) {
     val hiddenCount: Int get() = hidden.values.sum()
 }
@@ -123,7 +125,19 @@ class FeedController(
 
     fun loadMore() = load(reset = false)
 
-    fun retry() = if (_state.value.items.isEmpty()) load(reset = true) else load(reset = false)
+    fun retry() {
+        val s = _state.value
+        when {
+            s.fromCache -> load(reset = true, pull = true)
+            s.items.isEmpty() -> load(reset = true)
+            else -> load(reset = false)
+        }
+    }
+
+    /** Сколько автоповторов подряд уже было: паузы 10 с, 30 с, 1 мин. */
+    var autoRetries = 0
+
+    private fun snapshotKey(key: FeedKey) = "${key.siteId}|${key.mode}|${key.sort}|${key.tags.joinToString(" ")}"
 
     private fun currentKey() = FeedKey(site.id, mode(), _sort.value, tags)
 
@@ -185,6 +199,8 @@ class FeedController(
                     )
                 }
                 val fresh = PostGrouper.group(chunk.posts).map { FeedItem(it) }
+                autoRetries = 0
+                if (reset) withContext(Dispatchers.IO) { c.snapshots.save(snapshotKey(key), chunk.posts) }
                 _state.update {
                     it.copy(
                         items = if (reset) fresh else it.items + fresh,
@@ -196,12 +212,34 @@ class FeedController(
                         plan = chunk.plan,
                         authDropped = it.authDropped || chunk.authDropped,
                         hidden = merge(if (reset) emptyMap() else it.hidden, chunk.hidden),
+                        fromCache = false,
                     )
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, refreshing = false, error = e) }
+                // Первая страница не пришла — показываем сохранённую, если есть.
+                val cached = if (reset && (_state.value.items.isEmpty() || _state.value.fromCache)) {
+                    withContext(Dispatchers.IO) { c.snapshots.load(snapshotKey(key)) }
+                        ?.let { posts -> c.negative.blacklist.value.partition(posts).first }
+                        ?.takeIf { it.isNotEmpty() }
+                } else {
+                    null
+                }
+                _state.update {
+                    if (cached != null) {
+                        it.copy(
+                            items = PostGrouper.group(cached).map { group -> FeedItem(group) },
+                            loading = false,
+                            refreshing = false,
+                            error = e,
+                            fromCache = true,
+                            endReached = true,
+                        )
+                    } else {
+                        it.copy(loading = false, refreshing = false, error = e)
+                    }
+                }
             }
         }
     }

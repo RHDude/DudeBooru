@@ -2,6 +2,10 @@
 
 package app.dudebooru.ui.collections
 
+import app.dudebooru.ui.face.EmptyState
+import app.dudebooru.ui.face.Kaomoji
+import app.dudebooru.ui.face.rememberKaomoji
+
 import android.os.Environment
 import android.os.StatFs
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -146,7 +150,7 @@ fun SavedScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit) {
                 item { FilterChip(selected = false, onClick = { newFolder = true }, label = { Text("+ " + stringResource(R.string.saved_new_folder)) }) }
             }
             if (state.items.isEmpty()) {
-                EmptyState("(￣～￣;)", stringResource(R.string.saved_empty), stringResource(R.string.saved_empty_hint))
+                EmptyState(rememberKaomoji(listOf("(￣～￣;)") + Kaomoji.BORED), stringResource(R.string.saved_empty), stringResource(R.string.saved_empty_hint))
             } else {
                 FeedList(controller, actions, grid = true, onLongPress = { sheetPost = it })
             }
@@ -308,7 +312,7 @@ fun ProfileScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit, o
             }
             when (tab) {
                 0 -> if (liked.items.isEmpty()) {
-                    EmptyState("(´･ω･`)", stringResource(R.string.likes_empty), null)
+                    EmptyState(rememberKaomoji(listOf("(´･ω･`)") + Kaomoji.BORED), stringResource(R.string.likes_empty), null)
                 } else {
                     FeedList(likedFeed, actions, grid = true)
                 }
@@ -360,7 +364,7 @@ fun HistoryScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit) {
             if (tab == 0) {
                 HistoryPosts(feed, actions)
             } else if (searches.isEmpty()) {
-                EmptyState("( ˘ω˘ )", stringResource(R.string.history_empty), null)
+                EmptyState(rememberKaomoji(listOf("( ˘ω˘ )") + Kaomoji.BORED), stringResource(R.string.history_empty), null)
             } else {
                 LazyColumn {
                     items(searches, key = { it.site + ":" + it.query }) { entry ->
@@ -384,7 +388,7 @@ fun HistoryScreen(vm: MainViewModel, actions: PostActions, onBack: () -> Unit) {
 private fun HistoryPosts(feed: app.dudebooru.ui.feed.FeedController, actions: PostActions) {
     val state by feed.state.collectAsStateWithLifecycle()
     if (state.items.isEmpty()) {
-        EmptyState("( ˘ω˘ )", stringResource(R.string.history_empty), null)
+        EmptyState(rememberKaomoji(listOf("( ˘ω˘ )") + Kaomoji.BORED), stringResource(R.string.history_empty), null)
     } else {
         FeedList(feed, actions, grid = true)
     }
@@ -407,7 +411,7 @@ fun ArtistsScreen(vm: MainViewModel, onBack: () -> Unit) {
         },
     ) { padding ->
         if (subs.isEmpty()) {
-            Box(Modifier.padding(padding)) { EmptyState("(￣ー￣)", stringResource(R.string.artists_empty), stringResource(R.string.artists_empty_hint)) }
+            Box(Modifier.padding(padding)) { EmptyState(rememberKaomoji(listOf("(￣ー￣)") + Kaomoji.BORED), stringResource(R.string.artists_empty), stringResource(R.string.artists_empty_hint)) }
             return@Scaffold
         }
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
@@ -468,7 +472,7 @@ private fun DownloadsList(vm: MainViewModel, downloads: List<DownloadEntity>) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     if (downloads.isEmpty()) {
-        EmptyState("(・ω・)ノ", stringResource(R.string.downloads_empty), null)
+        EmptyState(rememberKaomoji(listOf("(・ω・)ノ") + Kaomoji.BORED), stringResource(R.string.downloads_empty), null)
         return
     }
     val running = downloads.filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.PAUSED }
@@ -533,17 +537,3 @@ private fun DownloadsList(vm: MainViewModel, downloads: List<DownloadEntity>) {
 
 // ---------------------------------------------------------------------------------------------
 
-/** Пустой экран: крупный каомодзи по центру и человеческий текст. */
-@Composable
-fun EmptyState(kaomoji: String, text: String, hint: String?) {
-    Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(48.dp))
-        Text(kaomoji, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(16.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-        hint?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        }
-    }
-}
