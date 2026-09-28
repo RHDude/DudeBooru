@@ -45,7 +45,7 @@
     <string name="menu">Menu</string>
     <string name="post_actions">Post actions</string>
     <string name="censor_tap_to_show">NSFW · tap to show</string>
-    <string name="settings_content">Content</string>
+    <string name="settings_content">Content and censorship</string>
     <string name="settings_censor">NSFW censorship</string>
     <string name="censor_style_spoiler">Spoiler</string>
     <string name="censor_style_blur">Blur</string>
@@ -145,9 +145,8 @@
     <string name="mirror_likes_hint">A like becomes an upvote and publicly changes the post score. Danbooru gives new accounts few votes — they are sent from a queue.</string>
     <string name="import_favorites_done">Favorites moved to Saved: %1$d</string>
     <string name="settings_downloads">Downloads</string>
-    <string name="dl_folder">Folder: %1$s</string>
+    <string name="dl_folder">Download folder</string>
     <string name="dl_folder_default">Pictures (default)</string>
-    <string name="dl_folder_pick">Choose folder</string>
     <string name="dl_folder_reset">Default</string>
     <string name="dl_template">File name template</string>
     <string name="dl_template_preview">Result: %1$s</string>
@@ -455,7 +454,7 @@
     <string name="onb_drag">Drag</string>
     <string name="onb_look_title">Look</string>
     <string name="onb_look_monet">Monet</string>
-    <string name="onb_accounts_hint">You can sign in to site accounts in Settings → Accounts and profile; it lifts some site limits</string>
+    <string name="onb_accounts_hint">You can sign in to site accounts in Settings → Accounts; it lifts some site limits</string>
 
     <!-- Profile -->
     <string name="profile_default_name">Dude</string>
@@ -500,6 +499,43 @@
     <string name="update_allow_install">Allow DudeBooru to install apps, then tap “Download and install” again</string>
     <string name="update_foreign_signature">The file is signed with a different key and cannot be installed over this version. Download the release from GitHub manually</string>
     <string name="drawer_update">Update to %1$s</string>
+
+    <!-- Settings sections -->
+    <string name="settings_profile_hint">Name, nickname and avatar</string>
+    <string name="settings_accounts">Accounts</string>
+    <string name="settings_accounts_hint">Sign in to sites and sync favorites</string>
+    <string name="settings_accounts_signed_in">Signed in: %1$s</string>
+    <string name="settings_accounts_invalid">Sign in again: %1$s</string>
+    <string name="settings_feed_hint">Posts or grid, double tap, GIFs</string>
+    <string name="settings_content_censor_on">%1$s · NSFW is covered</string>
+    <string name="settings_content_censor_off">%1$s · no censorship</string>
+    <string name="settings_look_hint">Themes, app icon, language</string>
+    <string name="settings_notifications_hint">New works by artists, app updates</string>
+    <string name="settings_notifications_blocked">Turned off in Android settings</string>
+    <string name="settings_downloads_hint">Folder, file names, Wi-Fi only</string>
+    <string name="settings_network_hint">Proxy and DNS, if a site will not open</string>
+    <string name="settings_network_proxy">Proxy: %1$s</string>
+    <string name="settings_feed_layout">Feed layout</string>
+    <string name="settings_double_tap_hint">A heart pops up right on the picture</string>
+    <string name="settings_animate_gifs_hint">Turn off to save data and battery</string>
+    <string name="settings_mode">What to show</string>
+    <string name="settings_mode_hint">NSFW and “All” are for adults only. The same switch is in the side menu</string>
+    <string name="settings_censor_group">Censorship</string>
+    <string name="settings_censor_hint">Explicit pictures stay covered until you tap them</string>
+    <string name="settings_hidden">Hidden</string>
+    <string name="settings_negative_tags_hint">Posts with these tags never show up</string>
+    <string name="settings_show_hidden_hint">Shows how many posts the filters removed</string>
+    <string name="settings_language">App language</string>
+    <string name="settings_language_system">As in the system</string>
+    <string name="notify_updates_hint">Checked once a day, with the list of changes</string>
+    <string name="notify_system_hint">Sound, vibration, lock screen</string>
+    <string name="notify_blocked">DudeBooru notifications are turned off in Android. Tap to turn them on</string>
+    <string name="dl_group_download">Downloading</string>
+    <string name="dl_wifi_only_hint">Mobile data is not used</string>
+    <string name="dl_write_tags_hint">Gallery apps and file search find pictures by tags</string>
+    <string name="dl_template_vars">Tap a variable to insert it at the cursor</string>
+    <string name="network_proxy">Proxy</string>
+
     <string name="about_whats_new">What is new in %1$s</string>
-    <string name="whats_new">• A bell on the artist page: turn off new work notifications for one artist without unfollowing\n• Notifications about new works from artists you follow and about new app versions\n• Update check and installing a new version right from the app\n• English interface\n• Bigger buttons under posts, Twitter and VK style; “details” in the viewer sits next to the like\n• Carousel: an image of a different shape is centered on a blurred backdrop, no grey bars\n• Folder sort order survives a restart\n• The header title changes together with the folder swipe\n• Multi-tag search: typed words are no longer lost when you pick a suggestion\n• Censorship also works in Likes, History and Saved; censorship strength changes instantly, with a preview\n• “Random post” is prepared in advance and shows loading or an error instead of a black screen\n• Profile in a single scroll, “My tags” can be collapsed\n• Smoother feed scrolling; side menu transitions without a jerk\n• Launch splash in the app theme (Android 12+)</string>
+    <string name="whats_new">• Settings are split into sections with icons: accounts, feed, content, appearance, notifications, downloads, network, about\n• The side menu opens with a swipe to the right anywhere on the first folder\n• App language right from the settings (Android 13+)\n• A bell on the artist page: turn off new work notifications for one artist without unfollowing\n• Notifications about new works from artists you follow and about new app versions\n• Update check and installing a new version right from the app\n• English interface\n• Bigger buttons under posts, Twitter and VK style; “details” in the viewer sits next to the like\n• Carousel: an image of a different shape is centered on a blurred backdrop, no grey bars\n• Folder sort order survives a restart\n• The header title changes together with the folder swipe\n• Multi-tag search: typed words are no longer lost when you pick a suggestion\n• Censorship also works in Likes, History and Saved; censorship strength changes instantly, with a preview\n• “Random post” is prepared in advance and shows loading or an error instead of a black screen\n• Profile in a single scroll, “My tags” can be collapsed\n• Smoother feed scrolling; side menu transitions without a jerk\n• Launch splash in the app theme (Android 12+)</string>
 </resources>

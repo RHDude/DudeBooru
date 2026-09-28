@@ -44,15 +44,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dudebooru.R
@@ -164,9 +170,9 @@ private fun MainFolders(vm: MainViewModel, folders: List<SiteConfig>, site: Site
                 onMove = vm::moveFolder,
                 stateOf = { vm.folderFeed(it).state },
             )
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().nestedScroll(rememberDrawerPull(onOpenDrawer))) {
                 FolderPager(vm, folders, site, actions, pager)
-                // Пейджер на первой папке забирает жест растяжением — у края ловим его сами.
+                // На остальных папках свайп вправо листает к предыдущей — меню открывается от края.
                 EdgeSwipe(onOpen = onOpenDrawer, modifier = Modifier.align(Alignment.CenterStart))
             }
         }
@@ -263,6 +269,43 @@ private fun FolderChips(
                     DropdownMenuItem(text = { Text(stringResource(R.string.folder_move_right)) }, onClick = { menu = false; onMove(folder.id, 1) })
                     DropdownMenuItem(text = { Text(stringResource(R.string.folder_hide)) }, onClick = { menu = false; onHide(folder.id) })
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Свайп вправо, который лента уже не может забрать (первая папка, первая картинка карусели), открывает меню —
+ * из любого места экрана, как в Telegram. Остаток жеста забираем, чтобы лента не тянулась растяжением.
+ */
+@Composable
+private fun rememberDrawerPull(onOpen: () -> Unit): NestedScrollConnection {
+    val density = LocalDensity.current
+    val open by rememberUpdatedState(onOpen)
+    return remember(density) {
+        val distance = with(density) { 56.dp.toPx() }
+        val flingDistance = with(density) { 16.dp.toPx() }
+        val flingVelocity = with(density) { 700.dp.toPx() }
+        object : NestedScrollConnection {
+            var pulled = 0f
+            var opened = false
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput || available.x <= 0f) return Offset.Zero
+                pulled += available.x
+                if (!opened && pulled > distance) {
+                    opened = true
+                    open()
+                }
+                return Offset(available.x, 0f)
+            }
+
+            // Короткий быстрый рывок тоже открывает: как у самого меню.
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (!opened && pulled > flingDistance && available.x > flingVelocity) open()
+                pulled = 0f
+                opened = false
+                return Velocity.Zero
             }
         }
     }
