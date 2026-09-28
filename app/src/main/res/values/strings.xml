@@ -595,6 +595,8 @@
     <string name="about_crash_hint">The report stays on the phone until you send it yourself</string>
     <string name="about_licenses">Open source licenses</string>
     <string name="about_licenses_hint">DudeBooru is built on these open libraries</string>
+    <string name="about_app_license">GNU GPL 3.0 or later</string>
+    <string name="about_app_license_hint">Free software: you may use, study, change and share it. Modified versions are shared under the same license, with their source code</string>
     <string name="about_sites">Sources</string>
     <string name="about_disclaimer">Pictures and tags belong to their authors and the sites. DudeBooru is not affiliated with Danbooru, Yande.re or Konachan</string>
     <string name="lock_title">DudeBooru is locked</string>

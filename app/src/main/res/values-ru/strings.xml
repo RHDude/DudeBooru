@@ -606,6 +606,8 @@
     <string name="about_crash_hint">Отчёт хранится на телефоне, пока вы сами его не отправите</string>
     <string name="about_licenses">Лицензии открытых библиотек</string>
     <string name="about_licenses_hint">DudeBooru собран на этих открытых библиотеках</string>
+    <string name="about_app_license">GNU GPL 3.0 или новее</string>
+    <string name="about_app_license_hint">Свободная программа: её можно использовать, изучать, менять и распространять. Изменённые версии распространяются по той же лицензии и с исходным кодом</string>
     <string name="about_sites">Источники</string>
     <string name="about_disclaimer">Картинки и теги принадлежат авторам и сайтам. DudeBooru не связан с Danbooru, Yande.re и Konachan</string>
     <string name="lock_title">DudeBooru заблокирован</string>
