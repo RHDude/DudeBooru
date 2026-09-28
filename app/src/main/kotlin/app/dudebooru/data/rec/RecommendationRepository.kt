@@ -24,6 +24,7 @@ import app.dudebooru.data.tags.TagDictionary
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -37,6 +38,7 @@ class RecommendationRepository(
     private val accounts: AccountRepository,
     private val negative: NegativeTags,
     private val tags: TagDictionary,
+    private val settings: app.dudebooru.data.settings.SettingsRepository,
 ) {
     private val mutex = Mutex()
     private var cached: Pair<Int, TasteProfile>? = null
@@ -44,10 +46,14 @@ class RecommendationRepository(
     /** Пока лайков меньше — холодный старт: популярное за неделю. */
     val coldStartLikes = 10
 
-    /** Профиль пересчитывается сразу после лайка: кэш сбрасывается по числу сигналов. */
+    /**
+     * Профиль пересчитывается сразу после лайка: кэш сбрасывается по числу сигналов.
+     * Настройки → Рекомендации: сохранённые можно не учитывать, «Сбросить профиль» отсекает старые сигналы.
+     */
     suspend fun profile(): TasteProfile = mutex.withLock {
-        val rows = db.taste().signals()
-        val signature = rows.size * 31 + rows.sumOf { it.at.hashCode() }
+        val prefs = settings.recPrefs.first()
+        val rows = db.taste().signals().filter { it.at > prefs.resetAt && (prefs.useSaved || it.kind != SignalKind.SAVE.name) }
+        val signature = (rows.size * 31 + rows.sumOf { it.at.hashCode() }) * 31 + prefs.hashCode()
         cached?.let { (sig, profile) -> if (sig == signature) return@withLock profile }
         val signals = rows.mapNotNull { row ->
             val post = runCatching { BooruJson.decodeFromString(Post.serializer(), row.json) }.getOrNull() ?: return@mapNotNull null
@@ -123,7 +129,7 @@ class RecommendationRepository(
         val exclude = shown + db.taste().seenKeys() + db.taste().collectedKeys()
         val allowed = candidates.filter { mode.allows(it.rating) && blacklist.match(it) == null }
         cache(allowed)
-        return Recommender.rank(allowed, profile, exclude)
+        return Recommender.rank(allowed, profile, exclude, exploreShare = settings.recPrefs.first().exploreShare.toDouble())
     }
 
     /** «Найти похожие»: профиль из одного поста, кандидаты по его тегам. */

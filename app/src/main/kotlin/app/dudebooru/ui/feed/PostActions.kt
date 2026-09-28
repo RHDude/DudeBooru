@@ -23,6 +23,11 @@ interface PostActions {
     fun notInterested(post: Post)
     fun makeAvatar(post: Post)
 
+    /** Долгое нажатие: лист быстрых действий (скачать оригинал, сохранить, поделиться…). */
+    fun quickActions(post: Post, group: List<Post> = listOf(post)) {
+        download(post, original = true)
+    }
+
     /** Картинка поста — фоном своей темы. */
     fun useAsBackground(post: Post) {}
     suspend fun pools(post: Post): List<PoolInfo>

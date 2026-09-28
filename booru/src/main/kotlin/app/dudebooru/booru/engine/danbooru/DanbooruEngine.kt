@@ -95,7 +95,7 @@ class DanbooruEngine(
             rules = RULES,
             userTerms = userTerms,
             systemTerms = listOfNotNull(ratingTerm(request.mode)) + listOfNotNull(ageTerm(request.sort, userTerms)),
-            orderTerm = orderTerm(request.sort),
+            orderTerm = orderTerm(request.sort, pageSize),
             limit = tagLimit,
             postCounts = countsIfNeeded(userTerms, tagLimit),
         )
@@ -123,8 +123,8 @@ class DanbooruEngine(
         val visible = posts.filter { it.isViewable && request.mode.allows(it.rating) && matcher.matches(it) }
 
         // Порядок по умолчанию (новые сверху) листаем курсором «старше id»:
-        // свежие загрузки не сдвигают страницы и не дают дублей.
-        val defaultOrder = plan.serverTerms.none { RULES.metatagName(it) in ORDER_METATAGS }
+        // свежие загрузки не сдвигают страницы и не дают дублей. Случайная выдача — просто новая порция.
+        val defaultOrder = plan.serverTerms.none { RULES.metatagName(it) in ORDER_METATAGS || RULES.metatagName(it) == "random" }
         val next: PageKey? = when {
             raw.isEmpty() -> null
             defaultOrder -> PageKey.Before(raw.minOf { it.id })
@@ -442,7 +442,11 @@ class DanbooruEngine(
             ContentMode.ALL -> null
         }
 
-        fun orderTerm(sort: SortOrder): String? = when (sort) {
+        /**
+         * `order:…` для сортировки. Случайные — `random:N`, как кнопка «Random» на самом сайте:
+         * `order:random` на всей базе упирается в таймаут запроса и отвечает 500.
+         */
+        fun orderTerm(sort: SortOrder, pageSize: Int = 20): String? = when (sort) {
             SortOrder.NEW -> null
             SortOrder.HOT -> "order:rank"
             SortOrder.POPULAR_DAY, SortOrder.POPULAR_WEEK, SortOrder.POPULAR_MONTH, SortOrder.POPULAR_YEAR,
@@ -451,7 +455,7 @@ class DanbooruEngine(
             SortOrder.MPIXELS -> "order:mpixels"
             SortOrder.LANDSCAPE -> "order:landscape"
             SortOrder.PORTRAIT -> "order:portrait"
-            SortOrder.RANDOM -> "order:random"
+            SortOrder.RANDOM -> "random:$pageSize"
         }
 
         /** «Популярное» с поиском превращается в `order:score age:<1w`; `age:` слот не тратит. */

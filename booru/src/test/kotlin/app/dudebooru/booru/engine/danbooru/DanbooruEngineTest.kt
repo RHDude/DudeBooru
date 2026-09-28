@@ -97,17 +97,19 @@ class DanbooruEngineTest {
             ),
         )
         server.enqueue(TestSupport.json(TestSupport.fixture("danbooru_posts.json")))
-        // Лимит 2: order занимает слот, на сервер уйдёт один тег, второй проверится локально.
+        // Лимит 2: оба тега важнее сортировки и уходят на сервер, сортировка не влезает,
+        // исключение проверяется локально.
         val page = engine.posts(
-            FeedRequest(tags = listOf("headphones", "ikari_shinji"), sort = SortOrder.BEST, mode = ContentMode.ALL),
+            FeedRequest(tags = listOf("headphones", "ikari_shinji", "-comic"), sort = SortOrder.BEST, mode = ContentMode.ALL),
             null,
             20,
         )
         assertEquals("/tags.json", server.takeRequest().url.encodedPath)
-        assertEquals("order:score ikari_shinji", server.takeRequest().url.queryParameter("tags"))
-        assertEquals(listOf("headphones"), page.plan.localTerms)
+        assertEquals("ikari_shinji headphones", server.takeRequest().url.queryParameter("tags"))
+        assertEquals(listOf("-comic"), page.plan.localTerms)
+        assertTrue(page.plan.sortDropped)
         assertTrue(page.posts.isNotEmpty())
-        assertTrue(page.posts.all { it.allTags.containsAll(listOf("headphones", "ikari_shinji")) })
+        assertTrue(page.posts.none { "comic" in it.allTags })
     }
 
     @Test

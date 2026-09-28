@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Обновление из GitHub Releases: скачанный APK отдаётся системному установщику. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Блокировка приложения отпечатком или лицом (Настройки → Приватность). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!-- Ключи сайтов хранятся в Android Keystore; системный бэкап их не уносит. -->
     <application

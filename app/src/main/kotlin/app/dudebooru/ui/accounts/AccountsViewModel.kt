@@ -9,6 +9,13 @@ import app.dudebooru.booru.net.BooruException
 import app.dudebooru.booru.site.EngineType
 import app.dudebooru.booru.site.SiteConfig
 import app.dudebooru.data.account.StoredAccount
+import app.dudebooru.data.CacheInfo
+import app.dudebooru.data.settings.FolderPrefs
+import app.dudebooru.data.settings.FolderSettings
+import app.dudebooru.data.settings.PrivacyPrefs
+import app.dudebooru.data.settings.RecPrefs
+import app.dudebooru.data.settings.ViewerPrefs
+import app.dudebooru.booru.site.Sites
 import app.dudebooru.data.net.DohProvider
 import app.dudebooru.data.net.ProxyConfig
 import app.dudebooru.data.settings.CensorPrefs
@@ -22,6 +29,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -87,6 +96,75 @@ class AccountsViewModel(app: Application, private val c: AppContainer) : Android
 
     fun setNotifyUpdates(value: Boolean) {
         viewModelScope.launch { c.settings.setNotifyUpdates(value) }
+    }
+
+    // --- Источники и папки, просмотр, приватность, рекомендации, данные ---
+
+    val folders: StateFlow<FolderSettings?> =
+        c.settings.folders.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val folderPrefs = c.settings.folderPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, FolderPrefs())
+    val viewerPrefs = c.settings.viewerPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, ViewerPrefs())
+    val privacyPrefs = c.settings.privacyPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, PrivacyPrefs())
+    val recPrefs = c.settings.recPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, RecPrefs())
+    val negativeCount: StateFlow<Int> = c.negative.entries.map { it.size }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    /** Все источники по порядку папок, с отметкой «показывать». */
+    fun allSites(): List<SiteConfig> = Sites.builtIn
+
+    /** Хотя бы одна папка остаётся видимой. */
+    fun setFolderVisible(siteId: String, visible: Boolean) {
+        viewModelScope.launch {
+            val current = c.settings.folders.first()
+            if (!visible && current.order.count { it !in current.hidden } <= 1) return@launch
+            c.settings.setFolderHidden(siteId, !visible)
+        }
+    }
+
+    fun moveFolder(siteId: String, delta: Int) {
+        viewModelScope.launch {
+            val order = c.settings.folders.first().order.toMutableList()
+            val i = order.indexOf(siteId)
+            val j = (i + delta).coerceIn(0, order.lastIndex)
+            if (i < 0 || i == j) return@launch
+            order.add(j, order.removeAt(i))
+            c.settings.setFolderOrder(order)
+        }
+    }
+
+    fun setFolderPrefs(value: FolderPrefs) {
+        viewModelScope.launch { c.settings.setFolderPrefs(value) }
+    }
+
+    fun setViewerPrefs(value: ViewerPrefs) {
+        viewModelScope.launch { c.settings.setViewerPrefs(value) }
+    }
+
+    fun setPrivacyPrefs(value: PrivacyPrefs) {
+        viewModelScope.launch { c.settings.setPrivacyPrefs(value) }
+    }
+
+    fun setRecPrefs(value: RecPrefs) {
+        viewModelScope.launch { c.settings.setRecPrefs(value) }
+    }
+
+    /** Лайки и сохранённое остаются, профиль вкуса начинается заново с этого момента. */
+    fun resetRecs() {
+        viewModelScope.launch { c.settings.setRecPrefs(recPrefs.value.copy(resetAt = System.currentTimeMillis())) }
+    }
+
+    private val _cache = MutableStateFlow<CacheInfo.Sizes?>(null)
+    val cache: StateFlow<CacheInfo.Sizes?> = _cache.asStateFlow()
+
+    fun refreshCache() {
+        viewModelScope.launch { _cache.value = CacheInfo.sizes(getApplication<Application>()) }
+    }
+
+    fun clearCache() {
+        viewModelScope.launch {
+            _cache.value = null
+            CacheInfo.clear(getApplication<Application>())
+            _cache.value = CacheInfo.sizes(getApplication<Application>())
+        }
     }
 
     fun setSyncPrefs(value: SyncPrefs) {

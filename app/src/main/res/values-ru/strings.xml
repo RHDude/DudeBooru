@@ -512,20 +512,7 @@
     <string name="drawer_update">Обновить до %1$s</string>
 
     <!-- Разделы настроек -->
-    <string name="settings_profile_hint">Имя, ник и аватарка</string>
     <string name="settings_accounts">Аккаунты</string>
-    <string name="settings_accounts_hint">Вход на сайты и синхронизация избранного</string>
-    <string name="settings_accounts_signed_in">Вход выполнен: %1$s</string>
-    <string name="settings_accounts_invalid">Нужно войти заново: %1$s</string>
-    <string name="settings_feed_hint">Посты или сетка, двойной тап, GIF</string>
-    <string name="settings_content_censor_on">%1$s · NSFW под цензурой</string>
-    <string name="settings_content_censor_off">%1$s · без цензуры</string>
-    <string name="settings_look_hint">Темы, иконка приложения, язык</string>
-    <string name="settings_notifications_hint">Новые работы художников, обновления</string>
-    <string name="settings_notifications_blocked">Выключены в настройках Android</string>
-    <string name="settings_downloads_hint">Папка, имена файлов, только Wi-Fi</string>
-    <string name="settings_network_hint">Прокси и DNS, если сайт не открывается</string>
-    <string name="settings_network_proxy">Прокси: %1$s</string>
     <string name="settings_feed_layout">Вид ленты</string>
     <string name="settings_double_tap_hint">Сердечко появляется прямо на картинке</string>
     <string name="settings_animate_gifs_hint">Выключите, чтобы беречь трафик и батарею</string>
@@ -548,5 +535,91 @@
     <string name="network_proxy">Прокси</string>
 
     <string name="about_whats_new">Что нового в %1$s</string>
-    <string name="whats_new">• Настройки разбиты на разделы с иконками: аккаунты, лента, контент, оформление, уведомления, скачивание, сеть, о приложении\n• Боковое меню открывается свайпом вправо в любом месте первой папки\n• Язык приложения — прямо из настроек (Android 13+)\n• Колокольчик у художника: уведомления о новых работах можно выключить у одного художника, не отписываясь\n• Уведомления о новых работах из подписок и о новых версиях приложения\n• Проверка обновлений и установка новой версии прямо из приложения\n• Английский интерфейс\n• Кнопки под постом крупнее, в стиле Twitter и VK; «детали» в просмотре — рядом с лайком\n• Карусель: картинка другого формата стоит по центру на размытом фоне, без серых полос\n• Сортировка папки переживает перезапуск\n• Название в шапке меняется вместе со свайпом по папкам\n• Поиск по нескольким тегам: набранные слова больше не теряются при выборе подсказки\n• Цензура работает и в «Лайках», «Истории», «Сохранённых»; сила цензуры меняется сразу, с предпросмотром\n• «Случайный пост» готовится заранее и вместо чёрного экрана показывает загрузку или ошибку\n• Профиль в одну прокрутку, «Мои теги» сворачиваются\n• Лента листается плавнее; переходы из бокового меню без рывка\n• Сплэш при запуске в теме приложения (Android 12+)</string>
+    <string name="whats_new">• Настройки в стиле exteraGram: профиль по центру, разделы группами, заголовок по центру
+• Новые разделы: источники и папки, просмотр, рекомендации, приватность, данные и память
+• Все иконки заменены на Material Symbols от Google
+• Блокировка приложения отпечатком, лицом или PIN; запрет скриншотов
+• Просмотр: экран не гаснет, листание клавишами громкости, оригинал сразу
+• Папки растягиваются по ширине экрана, подсветка едет за свайпом
+• Долгое нажатие на пост открывает меню быстрых действий вместо мгновенного скачивания
+• Аккаунты: статус входа одной строкой, форма входа раскрывается по тапу
+• «О приложении»: журнал ошибок, лицензии, ссылки на сайты
+• Шапка ленты больше не светлеет при прокрутке
+• Поиск по двум тегам без аккаунта: оба тега уходят на сайт, сортировка уступает им место
+• «Случайный пост» на Danbooru больше не падает с ошибкой 500</string>
+    <!-- Настройки: источники, просмотр, приватность, данные, о приложении -->
+    <string name="settings_profile_edit">Изменить профиль</string>
+    <string name="settings_value_relogin">Войти заново</string>
+    <string name="settings_value_off">Выкл.</string>
+    <string name="settings_value_update">Обновление %1$s</string>
+    <string name="settings_sources">Источники и папки</string>
+    <string name="settings_viewer">Просмотр</string>
+    <string name="settings_recs">Рекомендации</string>
+    <string name="settings_privacy">Приватность</string>
+    <string name="settings_data">Данные и память</string>
+    <string name="profile_local_hint">Имя и ник хранятся только на этом телефоне и на сайты не отправляются</string>
+    <string name="accounts_sites">Сайты</string>
+    <string name="account_expired">Вход устарел — войдите заново</string>
+    <string name="account_api_key_where">Где взять ключ</string>
+    <string name="sources_folders">Папки на главном экране</string>
+    <string name="sources_hint">Стрелки меняют порядок папок, переключатель показывает или прячет папку. Первая папка открывается по умолчанию</string>
+    <string name="sources_sfw_only">только SFW</string>
+    <string name="sources_counts">Счётчики новых постов</string>
+    <string name="sources_counts_hint">Число на папке: сколько постов появилось с прошлого визита</string>
+    <string name="sources_swipe">Листать папки свайпом</string>
+    <string name="sources_swipe_hint">Свайп по ленте влево и вправо переключает источник</string>
+    <string name="viewer_original">Оригинал сразу</string>
+    <string name="viewer_original_hint">Иначе полный файл грузится при зуме — так экономится трафик</string>
+    <string name="viewer_volume">Листать клавишами громкости</string>
+    <string name="viewer_volume_hint">Громкость вниз — следующий пост, вверх — предыдущий</string>
+    <string name="viewer_screen_on">Экран не гаснет</string>
+    <string name="viewer_screen_on_hint">Пока открыт пост, экран не тускнеет и не выключается</string>
+    <string name="recs_explore_title">Посты на пробу</string>
+    <string name="recs_explore_hint">Доля постов не по профилю вкуса, чтобы подборка не замыкалась на себе</string>
+    <string name="recs_explore_none">Нет</string>
+    <string name="recs_use_saved">Учитывать сохранённые</string>
+    <string name="recs_use_saved_hint">Сохранённое весит вдвое больше лайка</string>
+    <string name="recs_reset">Сбросить профиль вкуса</string>
+    <string name="recs_reset_hint">Лайки и сохранённое останутся, подборка начнётся заново</string>
+    <string name="recs_reset_title">Сбросить профиль вкуса?</string>
+    <string name="recs_reset_text">Лайки и сохранённое не удалятся. Рекомендации будут учитывать только то, что понравится с этого момента</string>
+    <string name="recs_reset_confirm">Сбросить</string>
+    <string name="recs_reset_done">Профиль вкуса сброшен</string>
+    <string name="privacy_footer">Всё хранится на телефоне: никакой аналитики, сайты видят только поиск и действия с аккаунтом</string>
+    <string name="privacy_lock">Блокировка приложения</string>
+    <string name="privacy_lock_hint">Отпечаток, лицо или блокировка экрана телефона при входе</string>
+    <string name="privacy_lock_no_screen_lock">Сначала включите блокировку экрана в настройках Android</string>
+    <string name="privacy_secure">Скрыть от скриншотов и в недавних</string>
+    <string name="privacy_secure_hint">Скриншоты и запись экрана запрещены, в списке недавних приложений — пустое превью</string>
+    <string name="privacy_history">Вести историю просмотров</string>
+    <string name="privacy_history_hint">Из неё собираются «История» и рекомендации</string>
+    <string name="data_cache">Кэш</string>
+    <string name="data_cache_hint">Лайки, сохранённое, скачанные файлы и настройки не удаляются</string>
+    <string name="data_images">Картинки</string>
+    <string name="data_images_hint">Превью и открытые посты, до 512 МБ</string>
+    <string name="data_other">Прочее</string>
+    <string name="data_other_hint">Ленты для офлайна, файлы для «Поделиться», обновления</string>
+    <string name="data_clear">Очистить кэш</string>
+    <string name="data_cleared">Кэш очищен</string>
+    <string name="about_version_chip">Версия %1$s · сборка %2$d</string>
+    <string name="about_tagline">Danbooru, Yande.re, Konachan и Safebooru в одной ленте — как сайт, только удобнее</string>
+    <string name="about_crash_log">Журнал ошибок</string>
+    <string name="about_crash_send">Нажмите, чтобы отправить отчёт в Telegram или на почту</string>
+    <string name="about_crash_empty">Вылетов не было</string>
+    <string name="about_crash_clear">Очистить журнал</string>
+    <string name="about_crash_hint">Отчёт хранится на телефоне, пока вы сами его не отправите</string>
+    <string name="about_licenses">Лицензии открытых библиотек</string>
+    <string name="about_licenses_hint">DudeBooru собран на этих открытых библиотеках</string>
+    <string name="about_sites">Источники</string>
+    <string name="about_disclaimer">Картинки и теги принадлежат авторам и сайтам. DudeBooru не связан с Danbooru, Yande.re, Konachan и Sakugabooru</string>
+    <string name="lock_title">DudeBooru заблокирован</string>
+    <string name="lock_unlock">Разблокировать</string>
+    <string name="lock_prompt_title">Вход в DudeBooru</string>
+    <string name="lock_prompt_subtitle">Отпечаток, лицо или блокировка экрана</string>
+    <!-- Долгое нажатие на пост -->
+    <string name="quick_original">Оригинал</string>
+    <string name="quick_save">Сохранить</string>
+    <string name="quick_saved">Сохранено</string>
+    <string name="quick_share">Поделиться</string>
+    <string name="quick_similar">Похожие</string>
 </resources>

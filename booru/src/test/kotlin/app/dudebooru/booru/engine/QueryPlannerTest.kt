@@ -50,9 +50,32 @@ class QueryPlannerTest {
             orderTerm = "order:score",
             limit = 2,
         )
-        assertTrue(plan.serverTerms.containsAll(listOf("score:>100", "width:>=1920", "order:score")))
-        assertEquals(1, plan.serverTerms.count { it in setOf("a", "b", "c") })
-        assertEquals(2, plan.localTerms.size)
+        assertTrue(plan.serverTerms.containsAll(listOf("score:>100", "width:>=1920")))
+        assertEquals(2, plan.serverTerms.count { it in setOf("a", "b", "c") })
+        assertEquals(1, plan.localTerms.size)
+    }
+
+    @Test
+    fun `two tags on a free account beat the sort`() {
+        val plan = QueryPlanner.plan(
+            siteId = "danbooru",
+            rules = dan,
+            userTerms = listOf("hatsune_miku", "twintails"),
+            systemTerms = listOf("rating:g,s"),
+            orderTerm = "order:rank",
+            limit = 2,
+        )
+        assertEquals(listOf("rating:g,s", "hatsune_miku", "twintails"), plan.serverTerms)
+        assertTrue(plan.localTerms.isEmpty())
+        assertTrue(plan.sortDropped)
+    }
+
+    @Test
+    fun `sort takes the slot a negative tag would have taken`() {
+        val plan = QueryPlanner.plan("danbooru", dan, listOf("hatsune_miku", "-comic"), emptyList(), "order:rank", limit = 2)
+        assertEquals(listOf("order:rank", "hatsune_miku"), plan.serverTerms)
+        assertEquals(listOf("-comic"), plan.localTerms)
+        assertFalse(plan.sortDropped)
     }
 
     @Test

@@ -88,7 +88,7 @@ class AppContainer(app: Application) {
 
     val downloads = DownloadRepository(app, db, settings)
 
-    val recs = RecommendationRepository(db, registry, accounts, negative, tags)
+    val recs = RecommendationRepository(db, registry, accounts, negative, tags, settings)
 
     val subscriptions = SubscriptionRepository(db.subscriptions(), registry, accounts, settings, negative)
 

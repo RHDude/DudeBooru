@@ -27,4 +27,6 @@ sealed interface Route {
 }
 
 /** Разделы настроек в порядке списка. */
-enum class SettingsPage { PROFILE, ACCOUNTS, FEED, CONTENT, LOOK, NOTIFICATIONS, DOWNLOADS, NETWORK, ABOUT }
+enum class SettingsPage {
+    PROFILE, ACCOUNTS, SOURCES, FEED, VIEWER, CONTENT, RECS, LOOK, NOTIFICATIONS, DOWNLOADS, PRIVACY, NETWORK, DATA, ABOUT, LICENSES,
+}

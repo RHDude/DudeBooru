@@ -45,6 +45,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -60,6 +61,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -123,6 +125,23 @@ fun ViewerScreen(
         }
         val start = remember { slots.indexOfFirst { it.post.key == startKey }.coerceAtLeast(0) }
         val pager = rememberPagerState(initialPage = start) { slots.size }
+        // Настройки → Просмотр: экран не гаснет, клавиши громкости листают посты.
+        val viewerPrefs = LocalViewerPrefs.current
+        val view = LocalView.current
+        DisposableEffect(viewerPrefs.keepScreenOn) {
+            view.keepScreenOn = viewerPrefs.keepScreenOn
+            onDispose { view.keepScreenOn = false }
+        }
+        DisposableEffect(viewerPrefs.volumeKeys) {
+            VolumeKeys.active = viewerPrefs.volumeKeys
+            onDispose { VolumeKeys.active = false }
+        }
+        LaunchedEffect(pager) {
+            VolumeKeys.steps.collect { step ->
+                val target = (pager.currentPage + step).coerceIn(0, (pager.pageCount - 1).coerceAtLeast(0))
+                if (target != pager.currentPage) pager.animateScrollToPage(target)
+            }
+        }
         var barsVisible by remember { mutableStateOf(true) }
         var detailsFor by remember { mutableStateOf<Post?>(null) }
         var dragY by remember { mutableFloatStateOf(0f) }
@@ -296,7 +315,8 @@ private fun ZoomPage(post: Post, onTap: () -> Unit) {
     val zoomState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 8f))
     val imageState = rememberZoomableImageState(zoomState)
     val zoomed = (zoomState.zoomFraction ?: 0f) > 0.05f
-    var wantOriginal by remember(post.key) { mutableStateOf(false) }
+    val originalAtOnce = LocalViewerPrefs.current.originalAtOnce
+    var wantOriginal by remember(post.key, originalAtOnce) { mutableStateOf(originalAtOnce) }
     if (zoomed) wantOriginal = true
     val light = if (post.mediaType == MediaType.GIF) post.fileUrl else post.sampleUrl ?: post.fileUrl
     val url = if (wantOriginal) post.fileUrl ?: light else light
