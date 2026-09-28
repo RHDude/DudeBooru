@@ -188,7 +188,8 @@ class DudeActions(
 
     override fun makeAvatar(post: Post) {
         scope.launch {
-            c.settings.setAvatar(post.previewUrl ?: post.sampleUrl)
+            // Картинка ленты, а не крошечное превью: в профиле аватарку можно растянуть во всю ширину.
+            c.settings.setAvatar(post.sampleUrl ?: post.previewUrl)
             toast(context.getString(R.string.avatar_set))
         }
     }
