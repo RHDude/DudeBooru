@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -16,11 +17,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -128,7 +126,8 @@ fun SwipeBackScreen(
     val currentOnBack by rememberUpdatedState(onBack)
     val density = LocalDensity.current
     state.flingVelocity = with(density) { 700.dp.toPx() }
-    val shadow = with(density) { 14.dp.toPx() }
+    val corner = with(density) { 28.dp.toPx() }
+    val elevation = with(density) { 16.dp.toPx() }
 
     val connection = remember(state, route) {
         object : NestedScrollConnection {
@@ -156,20 +155,24 @@ fun SwipeBackScreen(
     }
 
     Box(
-        modifier
+        Modifier
             .fillMaxSize()
             .onSizeChanged { state.width = it.width.toFloat().coerceAtLeast(1f) }
-            .graphicsLayer { translationX = if (state.route == route) state.offset else 0f }
-            .drawBehind {
-                // Тень у левого края уезжающего экрана.
-                if (state.route == route && state.offset > 0f) {
-                    drawRect(
-                        Brush.horizontalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.18f * (1f - state.progress))), startX = -shadow, endX = 0f),
-                        topLeft = Offset(-shadow, 0f),
-                        size = Size(shadow, size.height),
-                    )
+            .graphicsLayer {
+                val moving = state.route == route && state.offset > 0f
+                translationX = if (moving) state.offset else 0f
+                // Уезжающий экран — как карточка в Telegram: скруглённые углы и тень на предыдущий.
+                if (moving) {
+                    shape = RoundedCornerShape(minOf(corner, state.offset / 2f))
+                    clip = true
+                    shadowElevation = elevation * (1f - state.progress)
+                } else {
+                    clip = false
+                    shadowElevation = 0f
                 }
             }
+            // Фон и прочее — внутри сдвигаемого слоя: иначе фон остаётся на месте и закрывает экран под ним.
+            .then(modifier)
             .then(
                 if (!enabled) {
                     Modifier
