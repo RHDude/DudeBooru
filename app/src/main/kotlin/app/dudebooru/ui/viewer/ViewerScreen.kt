@@ -99,9 +99,10 @@ import kotlin.math.roundToInt
 private data class Slot(val post: Post, val card: Int, val inCard: Int, val cardSize: Int)
 
 /**
- * Просмотр: чёрный фон, сверху «3 из 120 · 2/4» и ⋮, снизу те же кнопки, что в карточке.
- * Свайп влево/вправо — картинки подряд (вся карусель, потом следующий пост), вниз — закрыть,
- * вверх — детали, тап — спрятать панели.
+ * Просмотр: чёрный фон, сверху «2 / 4» и ⋮, снизу те же кнопки, что в карточке.
+ * Свайп влево/вправо — картинки открытого поста (одна картинка — не листается),
+ * у «Случайного поста» ([wholeFeed]) — вся лента: «3 из 120 · 2/4».
+ * Вниз — закрыть, вверх — детали, тап — спрятать панели.
  */
 @Composable
 fun ViewerScreen(
@@ -110,10 +111,14 @@ fun ViewerScreen(
     actions: PostActions,
     onClose: () -> Unit,
     onSearchTag: (Post, String, Boolean) -> Unit,
+    wholeFeed: Boolean = false,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
-    val slots = remember(state.items) {
-        state.items.flatMapIndexed { card, item -> item.posts.mapIndexed { i, post -> Slot(post, card, i, item.posts.size) } }
+    val slots = remember(state.items, wholeFeed) {
+        val all = state.items.flatMapIndexed { card, item -> item.posts.mapIndexed { i, post -> Slot(post, card, i, item.posts.size) } }
+        // Открыл пост из ленты — листаются только его картинки, не соседние работы.
+        val card = if (wholeFeed) null else all.firstOrNull { it.post.key == startKey }?.card
+        if (card == null) all else all.filter { it.card == card }
     }
     BackHandler(onBack = onClose)
 
@@ -151,7 +156,7 @@ fun ViewerScreen(
 
         // Лента догружается сама.
         LaunchedEffect(pager.currentPage, slots.size) {
-            if (pager.currentPage >= slots.size - 3) controller.loadMore()
+            if (wholeFeed && pager.currentPage >= slots.size - 3) controller.loadMore()
         }
 
         val current = slots.getOrNull(pager.currentPage) ?: slots.last()
@@ -208,8 +213,12 @@ fun ViewerScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onClose) { Icon(DudeIcons.Back, stringResource(R.string.back), tint = Color.White) }
-                val position = stringResource(R.string.viewer_position, current.card + 1, state.items.size) +
-                    if (current.cardSize > 1) " · ${current.inCard + 1}/${current.cardSize}" else ""
+                val inCard = if (current.cardSize > 1) "${current.inCard + 1}/${current.cardSize}" else ""
+                val position = if (wholeFeed) {
+                    stringResource(R.string.viewer_position, current.card + 1, state.items.size) + if (inCard.isNotEmpty()) " · $inCard" else ""
+                } else {
+                    inCard
+                }
                 Text(position, color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 if (current.post.mediaType == MediaType.GIF) app.dudebooru.ui.feed.MediaBadge(current.post, Modifier.padding(end = 4.dp))
                 val group = state.items.getOrNull(current.card)?.posts.orEmpty()
