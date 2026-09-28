@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -10,8 +12,8 @@ plugins {
  * в корне проекта (локальная сборка; файл и сам ключ в git не попадают). Нет ключа — release собирается
  * неподписанным, подпись ставится отдельно (см. .github/workflows/release.yml).
  */
-val keystoreProperties = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
-    java.util.Properties().apply { file.inputStream().use { load(it) } }
+val keystoreProperties: Properties? = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
+    Properties().apply { file.inputStream().use { load(it) } }
 }
 
 fun signingValue(env: String, property: String): String? =
