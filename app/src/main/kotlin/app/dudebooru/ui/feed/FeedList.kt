@@ -93,9 +93,10 @@ fun FeedList(
     onTopSeen: ((Long) -> Unit)? = null,
     /** Своя заглушка пустой ленты (у художника: «в режиме SFW у него пусто»). */
     emptyContent: (@Composable () -> Unit)? = null,
-    header: (@Composable () -> Unit)? = null,
     /** Модификатор самого списка: nested scroll здесь получает остаток прокрутки раньше «потяни, чтобы обновить». */
     listModifier: Modifier = Modifier,
+    /** Последний параметр: шапку можно передать лямбдой после скобок. */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val state by controller.state.collectAsStateWithLifecycle()
