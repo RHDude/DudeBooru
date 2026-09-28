@@ -69,6 +69,7 @@ import app.dudebooru.ui.theme.DudeTheme
 import app.dudebooru.ui.theme.ThemeImportDialog
 import app.dudebooru.ui.theme.ThemeReveal
 import app.dudebooru.ui.theme.ThemeRevealHost
+import app.dudebooru.ui.face.LockScreen
 import app.dudebooru.ui.face.OnboardingScreen
 import app.dudebooru.ui.theme.LocalTagColors
 import app.dudebooru.ui.viewer.ViewerScreen
@@ -239,7 +240,7 @@ class MainActivity : ComponentActivity() {
                             else -> DudeRoot(vm, dark, onCloseApp = ::closeApp)
                         }
                         if (privacy?.appLock == true && isLocked) {
-                            app.dudebooru.ui.face.LockScreen(onUnlock = ::unlock, onLeave = ::finish)
+                            LockScreen(onUnlock = ::unlock, onLeave = ::finish)
                         }
                     }
                     val pending by vm.pendingTheme.collectAsStateWithLifecycle()
