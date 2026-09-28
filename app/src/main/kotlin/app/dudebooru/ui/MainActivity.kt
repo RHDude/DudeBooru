@@ -26,6 +26,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
+import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -329,16 +330,22 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
             BackHandler { if (!vm.back()) activity?.finish() }
             // Переходы между экранами; из ленты в пост картинка перелетает (общий элемент).
             val reduced = app.dudebooru.ui.face.rememberReducedMotion()
+            val swipe = remember { app.dudebooru.ui.common.SwipeBackState(scope) }
+            val top = vm.stack.last()
+            val below = vm.stack.getOrNull(vm.stack.lastIndex - 1)
+            val screen: @Composable (Route) -> Unit = { route -> RouteScreen(route, vm, actions, dark, mode, onCloseApp) }
+            // Под экраном, который тянут назад, — предыдущий.
+            app.dudebooru.ui.common.SwipeBackUnder(swipe, screen)
             androidx.compose.animation.SharedTransitionLayout {
                 androidx.compose.animation.AnimatedContent(
-                    targetState = vm.stack.last(),
+                    targetState = top,
                     transitionSpec = {
-                        if (reduced) {
-                            androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
-                        } else {
+                        when {
+                            // Ушёл свайпом: предыдущий уже на экране (слой снизу), встаёт на его место без перехода.
+                            swipe.popping || reduced -> androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
                             // Новый экран проявляется поверх, старый гаснет, когда его уже почти не видно:
                             // без «провала» через фон, пока оба экрана полупрозрачные.
-                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) togetherWith
+                            else -> androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) togetherWith
                                 androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120, delayMillis = 160))
                         }
                     },
@@ -348,86 +355,16 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                         app.dudebooru.ui.common.LocalSharedScope provides if (reduced) null else this@SharedTransitionLayout,
                         app.dudebooru.ui.common.LocalRouteScope provides this@AnimatedContent,
                     ) {
-                        when (route) {
-                        Route.Main -> MainShell(vm, actions, dark, onCloseApp)
-                        is Route.Search -> {
-                            val site = vm.c.registry.site(route.siteId) ?: return@CompositionLocalProvider
-                            val searchVm = viewModel(key = "search:${route.siteId}") { SearchViewModel(vm.c, site) }
-                            SearchScreen(
-                                vm = searchVm,
-                                initial = route.initial,
-                                onBack = { vm.back() },
-                                onSearch = { tags ->
-                                    vm.back()
-                                    vm.openSearchResults(route.siteId, tags)
-                                },
-                            )
-                        }
-                        is Route.Results -> {
-                            val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
-                            ResultsScreen(
-                                controller = controller,
-                                actions = actions,
-                                onBack = { vm.back() },
-                                onEditQuery = { vm.navigate(Route.Search(controller.site.id, controller.tags.joinToString(" "))) },
-                            )
-                        }
-                        is Route.Viewer -> {
-                            val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
-                            ViewerScreen(
-                                controller = controller,
-                                startKey = route.startKey,
-                                wholeFeed = route.wholeFeed,
-                                actions = actions,
-                                onClose = { vm.back() },
-                                onSearchTag = { post, tag, add ->
-                                    if (add) {
-                                        vm.navigate(Route.Search(post.site, (controller.tags + tag).distinct().joinToString(" ")))
-                                    } else {
-                                        vm.openSearchResults(post.site, listOf(tag))
-                                    }
-                                },
-                            )
-                        }
-                        is Route.Artist -> {
-                            val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
-                            ArtistScreen(vm, controller, route.name, actions, onBack = { vm.back() })
-                        }
-                        is Route.Settings -> {
-                            // Одна модель на все разделы: формы входа и черновики не теряются при переходах.
-                            val accountsVm = viewModel { AccountsViewModel(context.applicationContext as android.app.Application, vm.c) }
-                            app.dudebooru.ui.settings.SettingsScreen(
-                                vm = accountsVm,
-                                page = route.page,
-                                onBack = { vm.back() },
-                                onOpen = vm::navigate,
-                                mode = mode,
-                                onMode = vm::setMode,
-                                updates = vm.updates,
-                                onAskNotifications = actions::askNotifications,
-                            )
-                        }
-                        Route.NegativeTags -> NegativeTagsScreen(vm, onBack = { vm.back() })
-                        is Route.Soon -> SoonScreen(route.title, route.step, onBack = { vm.back() })
-                        Route.Saved -> SavedScreen(vm, actions, onBack = { vm.back() })
-                        Route.Profile -> ProfileScreen(vm, actions, onBack = { vm.back() }, onEdit = { vm.navigate(Route.Settings(app.dudebooru.ui.main.SettingsPage.PROFILE)) })
-                        Route.History -> HistoryScreen(vm, actions, onBack = { vm.back() })
-                        Route.Artists -> ArtistsScreen(vm, onBack = { vm.back() })
-                        Route.Downloads -> DownloadsScreen(vm, onBack = { vm.back() })
-                        Route.Recs -> app.dudebooru.ui.rec.RecsScreen(vm, actions, onBack = { vm.back() })
-                        Route.IconPicker -> app.dudebooru.ui.face.IconPickerScreen(onBack = { vm.back() })
-                        Route.Themes -> app.dudebooru.ui.theme.ThemesScreen(
-                            vm,
+                        // Свайпом вправо закрывается любой экран, кроме главного, просмотра и игры (там свои жесты).
+                        val swipeable = route == top && route != Route.Main && route !is Route.Viewer && route != Route.Game
+                        app.dudebooru.ui.common.SwipeBackScreen(
+                            state = swipe,
+                            route = route,
+                            below = if (swipeable) below else null,
                             onBack = { vm.back() },
-                            onEditor = { vm.navigate(Route.ThemeEditor) },
-                            onIconPicker = { vm.navigate(Route.IconPicker) },
-                        )
-                        Route.ThemeEditor -> app.dudebooru.ui.theme.ThemeEditorScreen(vm, onBack = { vm.back() })
-                        Route.Game -> app.dudebooru.ui.face.GameScreen(vm, onBack = { vm.back() })
-                        is Route.Similar -> {
-                            val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
-                            app.dudebooru.ui.rec.SimilarScreen(vm, controller, route.post, actions, onBack = { vm.back() })
-                        }
+                            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+                        ) {
+                            screen(route)
                         }
                     }
                 }
@@ -450,6 +387,93 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                 }
                 incomingOpen.value = null
             }
+        }
+    }
+}
+
+/** Экран маршрута. Вынесен, чтобы тот же экран можно было нарисовать и под уезжающим свайпом. */
+@Composable
+private fun RouteScreen(route: Route, vm: MainViewModel, actions: DudeActions, dark: Boolean, mode: app.dudebooru.booru.model.ContentMode, onCloseApp: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    when (route) {
+        Route.Main -> MainShell(vm, actions, dark, onCloseApp)
+        is Route.Search -> {
+            val site = vm.c.registry.site(route.siteId) ?: return
+            val searchVm = viewModel(key = "search:${route.siteId}") { SearchViewModel(vm.c, site) }
+            SearchScreen(
+                vm = searchVm,
+                initial = route.initial,
+                onBack = { vm.back() },
+                onSearch = { tags ->
+                    vm.back()
+                    vm.openSearchResults(route.siteId, tags)
+                },
+            )
+        }
+        is Route.Results -> {
+            val controller = vm.controller(route.controllerId) ?: return
+            ResultsScreen(
+                controller = controller,
+                actions = actions,
+                onBack = { vm.back() },
+                onEditQuery = { vm.navigate(Route.Search(controller.site.id, controller.tags.joinToString(" "))) },
+            )
+        }
+        is Route.Viewer -> {
+            val controller = vm.controller(route.controllerId) ?: return
+            ViewerScreen(
+                controller = controller,
+                startKey = route.startKey,
+                wholeFeed = route.wholeFeed,
+                actions = actions,
+                onClose = { vm.back() },
+                onSearchTag = { post, tag, add ->
+                    if (add) {
+                        vm.navigate(Route.Search(post.site, (controller.tags + tag).distinct().joinToString(" ")))
+                    } else {
+                        vm.openSearchResults(post.site, listOf(tag))
+                    }
+                },
+            )
+        }
+        is Route.Artist -> {
+            val controller = vm.controller(route.controllerId) ?: return
+            ArtistScreen(vm, controller, route.name, actions, onBack = { vm.back() })
+        }
+        is Route.Settings -> {
+            // Одна модель на все разделы: формы входа и черновики не теряются при переходах.
+            val accountsVm = viewModel { AccountsViewModel(context.applicationContext as android.app.Application, vm.c) }
+            app.dudebooru.ui.settings.SettingsScreen(
+                vm = accountsVm,
+                page = route.page,
+                onBack = { vm.back() },
+                onOpen = vm::navigate,
+                mode = mode,
+                onMode = vm::setMode,
+                updates = vm.updates,
+                onAskNotifications = actions::askNotifications,
+            )
+        }
+        Route.NegativeTags -> NegativeTagsScreen(vm, onBack = { vm.back() })
+        is Route.Soon -> SoonScreen(route.title, route.step, onBack = { vm.back() })
+        Route.Saved -> SavedScreen(vm, actions, onBack = { vm.back() })
+        Route.Profile -> ProfileScreen(vm, actions, onBack = { vm.back() }, onEdit = { vm.navigate(Route.Settings(app.dudebooru.ui.main.SettingsPage.PROFILE)) })
+        Route.History -> HistoryScreen(vm, actions, onBack = { vm.back() })
+        Route.Artists -> ArtistsScreen(vm, onBack = { vm.back() })
+        Route.Downloads -> DownloadsScreen(vm, onBack = { vm.back() })
+        Route.Recs -> app.dudebooru.ui.rec.RecsScreen(vm, actions, onBack = { vm.back() })
+        Route.IconPicker -> app.dudebooru.ui.face.IconPickerScreen(onBack = { vm.back() })
+        Route.Themes -> app.dudebooru.ui.theme.ThemesScreen(
+            vm,
+            onBack = { vm.back() },
+            onEditor = { vm.navigate(Route.ThemeEditor) },
+            onIconPicker = { vm.navigate(Route.IconPicker) },
+        )
+        Route.ThemeEditor -> app.dudebooru.ui.theme.ThemeEditorScreen(vm, onBack = { vm.back() })
+        Route.Game -> app.dudebooru.ui.face.GameScreen(vm, onBack = { vm.back() })
+        is Route.Similar -> {
+            val controller = vm.controller(route.controllerId) ?: return
+            app.dudebooru.ui.rec.SimilarScreen(vm, controller, route.post, actions, onBack = { vm.back() })
         }
     }
 }

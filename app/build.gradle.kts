@@ -28,8 +28,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // major * 10000 + minor * 100 + patch
-        versionCode = 902
-        versionName = "0.9.2"
+        versionCode = 903
+        versionName = "0.9.3"
         // Проверка обновлений через GitHub Releases; для F-Droid выключается: ./gradlew -PnoUpdateCheck
         buildConfigField("boolean", "UPDATE_CHECK", (!providers.gradleProperty("noUpdateCheck").isPresent).toString())
     }
