@@ -117,13 +117,25 @@ class RecommendationRepository(
                     }.getOrDefault(emptyList())
                 }
             }
+            // В лайках пока ничего не повторяется — профиль пуст: популярное за неделю, как на холодном старте.
+            val fallback = if (queries.isEmpty()) {
+                listOf(
+                    async {
+                        runCatching {
+                            engine.posts(FeedRequest(emptyList(), SortOrder.POPULAR_WEEK, mode), app.dudebooru.booru.engine.PageKey.Number(page), 40, session).posts
+                        }.getOrDefault(emptyList())
+                    },
+                )
+            } else {
+                emptyList()
+            }
             // Рекомендатор Danbooru — дополнительный источник, если есть вход и он вообще отвечает.
             val fromSite = if (page == 1 && session.credentials != null) {
                 listOf(async { runCatching { engine.recommendedForUser(50, session) }.getOrDefault(emptyList()) })
             } else {
                 emptyList()
             }
-            (fromQueries + fromSite).awaitAll().flatten()
+            (fromQueries + fallback + fromSite).awaitAll().flatten()
         }
         val blacklist = negative.blacklist.value
         val exclude = shown + db.taste().seenKeys() + db.taste().collectedKeys()
