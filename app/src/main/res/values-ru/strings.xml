@@ -622,4 +622,5 @@
     <string name="quick_saved">Сохранено</string>
     <string name="quick_share">Поделиться</string>
     <string name="quick_similar">Похожие</string>
+    <string name="icon_neutral_hint">Маскировка: на рабочем столе и в системе приложение будет называться «Галерея» — даже в окне удаления</string>
 </resources>
