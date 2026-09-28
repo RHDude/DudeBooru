@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DudeBooru</string>
+    <string name="date_locale" translatable="false">ru</string>
+
+    <!-- Лента -->
+    <string name="search_hint">Теги через пробел</string>
+    <string name="search">Поиск</string>
+    <string name="sort">Сортировка</string>
+    <string name="accounts">Аккаунты</string>
+    <string name="refresh">Обновить</string>
+    <string name="back">Назад</string>
+    <string name="clear">Очистить</string>
+    <string name="retry">Повторить</string>
+    <string name="load_more">Ещё</string>
+    <string name="feed_end">Дальше постов нет</string>
+    <string name="feed_empty">Ничего не нашли</string>
+    <string name="plan_server">на сервере</string>
+    <string name="plan_local">проверяется в приложении</string>
+    <string name="plan_sort_dropped">Сортировка не влезла в лимит тегов, лента идёт по новизне</string>
+    <string name="auth_dropped">Вход в %1$s больше не действует. Лента работает без входа</string>
+    <string name="relogin">Войти заново</string>
+
+    <string name="mode_sfw">SFW</string>
+    <string name="mode_nsfw">NSFW</string>
+    <string name="mode_all">Всё</string>
+
+    <string name="sort_new">Новое</string>
+    <string name="sort_hot">Горячее</string>
+    <string name="sort_popular_day">Популярное за день</string>
+    <string name="sort_popular_week">Популярное за неделю</string>
+    <string name="sort_popular_month">Популярное за месяц</string>
+    <string name="sort_popular_year">Популярное за год</string>
+    <string name="sort_best">Лучшее за всё время</string>
+    <string name="sort_favcount">По избранному</string>
+    <string name="sort_mpixels">Большие первыми</string>
+    <string name="sort_landscape">Горизонтальные</string>
+    <string name="sort_portrait">Вертикальные</string>
+    <string name="sort_random">Случайное</string>
+
+    <string name="menu">Меню</string>
+    <string name="censor_tap_to_show">NSFW · нажмите, чтобы показать</string>
+    <string name="settings_content">Контент</string>
+    <string name="settings_censor">Цензура NSFW</string>
+    <string name="censor_style_spoiler">Спойлер</string>
+    <string name="censor_style_blur">Размытие</string>
+    <string name="censor_style_pixel">Пиксели</string>
+    <string name="censor_strength">Сила</string>
+    <string name="censor_in_viewer">Закрывать и в просмотре</string>
+    <string name="censor_sensitive">Размывать и rating:s (слегка откровенное)</string>
+    <string name="settings_show_hidden">Отметка «скрыто N» в ленте</string>
+    <string name="adult_title">Вам есть 18?</string>
+    <string name="adult_text">В режимах NSFW и «Всё» показываются откровенные работы. Цензуру-спойлер можно включить глазом в боковом меню.</string>
+    <string name="adult_yes">Мне есть 18</string>
+    <string name="adult_no">Отмена</string>
+    <string name="hidden_mark">скрыто %1$d</string>
+    <string name="hidden_title">Что скрыто негативными тегами</string>
+    <string name="hidden_count">%1$d постов</string>
+    <string name="hidden_restore">Вернуть</string>
+    <string name="negative_note">Посты с этими тегами не попадают в ленту. Строка «tag_a tag_b» скрывает пост, только если на нём оба тега; работают «-tag» и «rating:q,e».</string>
+    <string name="negative_hint">Тег или комбинация</string>
+    <string name="negative_add">Добавить</string>
+    <string name="negative_all_sites">Все источники</string>
+    <string name="negative_check_title">«%1$s» есть не везде</string>
+    <string name="negative_check_hint">Нажмите на подсказку, чтобы добавить местный вариант для этого сайта</string>
+    <string name="negative_import">Импорт блэклиста из Danbooru</string>
+    <string name="negative_import_done">Добавлено строк: %1$d</string>
+    <string name="negative_import_login">Сначала войдите в Danbooru в настройках</string>
+    <string name="negative_empty">Список пуст — лента показывает всё по режиму</string>
+    <string name="negative_remove">Убрать</string>
+    <string name="feed_new_button">↑ %1$d новых</string>
+    <string name="feed_new_divider">Новое с прошлого визита</string>
+    <string name="settings_feed">Лента</string>
+    <string name="settings_feed_posts">Посты</string>
+    <string name="settings_feed_grid">Сетка</string>
+    <string name="settings_double_tap">Двойной тап — лайк</string>
+    <string name="settings_animate_gifs">GIF в ленте анимируются</string>
+    <string name="plan_legend">Сплошная рамка — ушло на сервер, пунктир — проверяется в приложении (лимит тегов)</string>
+
+    <!-- Папки -->
+    <string name="folder_mark_seen">Отметить всё просмотренным</string>
+    <string name="folder_move_left">Переставить левее</string>
+    <string name="folder_move_right">Переставить правее</string>
+    <string name="folder_hide">Скрыть папку</string>
+
+    <!-- Боковое меню -->
+    <string name="drawer_accounts">Аккаунты сайтов</string>
+    <string name="drawer_not_signed_in">вход не выполнен</string>
+    <string name="drawer_sign_in">Войти</string>
+    <string name="drawer_toggle_theme">Светлая или тёмная тема</string>
+    <string name="drawer_censor_on">Цензура NSFW включена</string>
+    <string name="drawer_censor_off">Цензура NSFW выключена</string>
+    <string name="drawer_profile">Мой профиль</string>
+    <string name="drawer_recommendations">Рекомендации</string>
+    <string name="drawer_saved">Сохранённые</string>
+    <string name="drawer_artists">Художники</string>
+    <string name="drawer_downloads">Загрузки</string>
+    <string name="drawer_history">История</string>
+    <string name="drawer_random">Случайный пост</string>
+    <string name="drawer_negative_tags">Негативные теги</string>
+    <string name="drawer_themes">Темы</string>
+    <string name="drawer_settings">Настройки</string>
+    <string name="drawer_close_app">Закрыть приложение</string>
+
+    <!-- Действия с постом -->
+    <string name="action_like">Нравится</string>
+    <string name="action_share">Поделиться</string>
+    <string name="action_save">Сохранить</string>
+    <string name="post_long_whole">целиком</string>
+    <string name="post_video">видео</string>
+    <string name="menu_download">Скачать</string>
+    <string name="menu_download_original">Скачать оригинал</string>
+    <string name="menu_download_all">Скачать все (%1$d)</string>
+    <string name="menu_save">В «Сохранённые»</string>
+    <string name="menu_unsave">Убрать из «Сохранённых»</string>
+    <string name="menu_artist">К художнику</string>
+    <string name="menu_pool">К пулу</string>
+    <string name="menu_copy_link">Скопировать ссылку</string>
+    <string name="menu_copy_image">Скопировать картинку</string>
+    <string name="menu_copy_direct">Скопировать прямую ссылку</string>
+    <string name="menu_similar">Найти похожие</string>
+    <string name="menu_not_interested">Не интересно…</string>
+    <string name="menu_make_avatar">Сделать аватаркой</string>
+    <string name="menu_open_site">Открыть на сайте</string>
+    <string name="download_done">Сохранено: %1$s</string>
+    <string name="download_failed">Не скачалось: %1$s</string>
+    <string name="download_all_done">Скачано %1$d из %2$d</string>
+    <string name="copied_link">Ссылка скопирована</string>
+    <string name="copied_image">Картинка в буфере обмена</string>
+    <string name="avatar_set">Аватарка обновлена</string>
+    <string name="tag_hidden">«%1$s» больше не будет в лентах</string>
+    <string name="not_interested_title">Не интересно</string>
+    <string name="not_interested_hint">Нажмите на тег, и посты с ним перестанут попадать в ленту</string>
+
+    <!-- Поиск -->
+    <string name="search_in">Поиск в %1$s</string>
+    <string name="search_recent">Недавние</string>
+    <string name="search_pin">Закрепить</string>
+    <string name="search_unpin">Открепить</string>
+    <string name="search_forget">Удалить из истории</string>
+
+    <!-- Просмотр -->
+    <string name="viewer_position">%1$d из %2$d</string>
+    <string name="viewer_details">Детали</string>
+    <string name="viewer_tap_for_sound">Нажмите для звука</string>
+    <string name="details_favs">в избранном у %1$d</string>
+    <string name="details_source">Источник</string>
+    <string name="details_family">Родитель и дети</string>
+    <string name="tag_search">Искать</string>
+    <string name="tag_add_to_search">Добавить к поиску</string>
+    <string name="tag_hide">Не показывать</string>
+    <string name="tag_wiki">Вики</string>
+    <string name="category_artist">Художник</string>
+    <string name="category_copyright">Копирайт</string>
+    <string name="category_character">Персонажи</string>
+    <string name="category_general">Общие</string>
+    <string name="category_meta">Мета</string>
+
+    <!-- Художник -->
+    <string name="artist_new">Новые</string>
+    <string name="artist_best">Лучшие</string>
+    <string name="artist_hide">Скрыть</string>
+
+    <!-- Скоро -->
+    <string name="soon_text">«%1$s» появится на шаге %2$d — «%3$s»</string>
+    <string name="step_filters">фильтры</string>
+    <string name="step_collections">коллекции</string>
+    <string name="step_recommendations">рекомендации</string>
+    <string name="step_face">лицо</string>
+    <string name="step_release">выпуск</string>
+
+    <!-- Карточка поста -->
+    <string name="artist_unknown">Неизвестный художник</string>
+    <string name="artist_and_more">%1$s и ещё %2$d</string>
+    <string name="date_today">сегодня в %1$s</string>
+    <string name="date_yesterday">вчера в %1$s</string>
+    <string name="date_this_year">%1$s в %2$s</string>
+    <string name="post_meta">%1$s · score %2$d · %3$d×%4$d</string>
+    <string name="post_family">родитель и дети</string>
+
+    <!-- Аккаунты -->
+    <string name="accounts_title">Настройки</string>
+    <string name="accounts_note">Вход снимает часть ограничений сайтов: у Danbooru без входа в поиске 2 тега. Ключи и хеши паролей хранятся зашифрованными в Android Keystore.</string>
+    <string name="account_login">Логин</string>
+    <string name="account_api_key">API-ключ</string>
+    <string name="account_api_key_help">Ключ создаётся в профиле Danbooru: My Account → API Key</string>
+    <string name="account_password">Пароль</string>
+    <string name="account_password_help">Пароль не сохраняется: на телефоне остаётся только хеш</string>
+    <string name="account_sign_in">Войти</string>
+    <string name="account_sign_out">Выйти</string>
+    <string name="account_checking">Проверяем…</string>
+    <string name="account_signed_in_as">Вход выполнен: %1$s</string>
+    <string name="account_level">Уровень: %1$s</string>
+    <string name="account_tag_limit">Тегов в запросе: %1$s</string>
+    <string name="account_tag_limit_unlimited">без лимита</string>
+    <string name="account_shared_with">Этот же аккаунт работает на: %1$s</string>
+    <string name="account_invalid">Вход больше не действует</string>
+    <string name="account_bad_danbooru_key">Ключ не подошёл, проверьте логин и API-ключ в профиле %1$s</string>
+    <string name="account_bad_password">Логин или пароль не подошли</string>
+    <string name="account_fill_fields">Заполните логин и %1$s</string>
+
+    <!-- Сеть -->
+    <string name="network_title">Сеть</string>
+    <string name="network_note">Если сайт не открывается из вашей сети, укажите свой прокси. Он действует для всех сайтов и картинок.</string>
+    <string name="network_direct">Напрямую</string>
+    <string name="network_host">Адрес прокси</string>
+    <string name="network_port">Порт</string>
+    <string name="network_save">Сохранить</string>
+
+    <!-- Ошибки сайтов -->
+    <string name="error_not_responding">%1$s не отвечает. Возможно, сайт лежит или до него не достучаться из вашей сети</string>
+    <string name="error_server">У %1$s ошибка на их стороне (%2$d). Обычно чинится само за несколько минут</string>
+    <string name="error_too_many">%1$s просит притормозить. Продолжим через %2$d с</string>
+    <string name="error_forbidden">%1$s закрыл доступ. Так бывает при блокировке по стране или IP. Попробуйте прокси в настройках</string>
+    <string name="error_unauthorized">Вход в %1$s больше не действует: ключ неверный или удалён. Лента пока работает без входа</string>
+    <string name="error_not_json">%1$s вместо данных вернул веб-страницу, например проверку «вы не робот». Откройте сайт в браузере один раз и вернитесь</string>
+    <string name="error_tag_limit">%1$s разрешает не больше %2$d тегов в запросе для вашего аккаунта</string>
+    <string name="error_bad_request">%1$s не принял запрос (%2$d)</string>
+    <string name="error_malformed">%1$s прислал ответ, который не удалось разобрать</string>
+    <string name="error_unknown">Что-то пошло не так: %1$s</string>
+</resources>
