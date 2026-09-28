@@ -544,7 +544,6 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
         const val DEFAULT_NICK = "dude"
 
-        /** Sakugabooru включается в настройках. */
-        val DEFAULT_HIDDEN = setOf(Sites.SAKUGABOORU.id)
+        val DEFAULT_HIDDEN = emptySet<String>()
     }
 }

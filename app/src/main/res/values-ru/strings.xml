@@ -50,7 +50,8 @@
     <string name="censor_style_blur">Размытие</string>
     <string name="censor_style_pixel">Пиксели</string>
     <string name="censor_strength">Сила</string>
-    <string name="censor_in_viewer">Закрывать и в просмотре</string>
+    <string name="censor_in_viewer">Открытый из ленты пост тоже закрыт</string>
+    <string name="censor_in_viewer_hint">Соседние посты в просмотре и «Случайный пост» закрыты всегда, пока не нажмёте</string>
     <string name="censor_sensitive">Размывать и rating:s (слегка откровенное)</string>
     <string name="settings_show_hidden">Отметка «скрыто N» в ленте</string>
     <string name="adult_title">Вам есть 18?</string>
@@ -167,7 +168,7 @@
     <string name="recs_explore">на пробу — вне вашего вкуса</string>
     <string name="similar_title">Похожие</string>
     <string name="similar_same_image">Эта же картинка на других сайтах:</string>
-    <string name="profile_my_tags_hint">Долгое нажатие — убрать тег из вкуса</string>
+    <string name="profile_my_tags_hint">Теги, которые повторяются в лайкнутом и сохранённом. Долгое нажатие — убрать тег из вкуса</string>
     <string name="icon_neutral_label">Галерея</string>
     <string name="icon_dudi">Дуди</string>
     <string name="icon_monet">Monet</string>
@@ -271,6 +272,10 @@
     <string name="viewer_position">%1$d из %2$d</string>
     <string name="viewer_details">Детали</string>
     <string name="viewer_tap_for_sound">Нажмите для звука</string>
+    <string name="video_play">Продолжить</string>
+    <string name="video_pause">Пауза</string>
+    <string name="video_sound_on">Включить звук</string>
+    <string name="video_sound_off">Выключить звук</string>
     <string name="details_favs">в избранном у %1$d</string>
     <string name="details_source">Источник</string>
     <string name="details_family">Родитель и дети</string>
@@ -405,6 +410,7 @@
     <string name="theme_override_hint">Кнопка в меню переключает тему до следующей смены по расписанию</string>
     <string name="theme_custom">Своя</string>
     <string name="theme_classic">Классическая</string>
+    <string name="theme_teto">Тето</string>
     <string name="theme_variant_light">Светлая</string>
     <string name="theme_variant_dark">Тёмная</string>
     <string name="theme_name">Название</string>
@@ -535,18 +541,13 @@
     <string name="network_proxy">Прокси</string>
 
     <string name="about_whats_new">Что нового в %1$s</string>
-    <string name="whats_new">• Настройки в стиле exteraGram: профиль по центру, разделы группами, заголовок по центру
-• Новые разделы: источники и папки, просмотр, рекомендации, приватность, данные и память
-• Все иконки заменены на Material Symbols от Google
-• Блокировка приложения отпечатком, лицом или PIN; запрет скриншотов
-• Просмотр: экран не гаснет, листание клавишами громкости, оригинал сразу
-• Папки растягиваются по ширине экрана, подсветка едет за свайпом
-• Долгое нажатие на пост открывает меню быстрых действий вместо мгновенного скачивания
-• Аккаунты: статус входа одной строкой, форма входа раскрывается по тапу
-• «О приложении»: журнал ошибок, лицензии, ссылки на сайты
-• Шапка ленты больше не светлеет при прокрутке
-• Поиск по тегам без аккаунта: сортировка работает всегда, лишние теги проверяются в приложении, лента грузится крупными страницами
-• «Случайный пост» на Danbooru больше не падает с ошибкой 500</string>
+    <string name="whats_new">• Цензура работает и в просмотре: соседние посты и «Случайный пост» закрыты, пока не нажмёте
+• «Мои теги» — только из лайкнутого и сохранённого, и только то, что повторяется
+• Плеер видео: полоса прогресса с перемоткой, время, пауза и звук
+• Видео и GIF отмечены по-разному — и в ленте, и в сетке
+• Тап по открытой папке — лента наверх
+• Новая тема «Тето»
+• Sakugabooru убран из источников</string>
     <!-- Настройки: источники, просмотр, приватность, данные, о приложении -->
     <string name="settings_profile_edit">Изменить профиль</string>
     <string name="settings_value_relogin">Войти заново</string>
@@ -611,7 +612,7 @@
     <string name="about_licenses">Лицензии открытых библиотек</string>
     <string name="about_licenses_hint">DudeBooru собран на этих открытых библиотеках</string>
     <string name="about_sites">Источники</string>
-    <string name="about_disclaimer">Картинки и теги принадлежат авторам и сайтам. DudeBooru не связан с Danbooru, Yande.re, Konachan и Sakugabooru</string>
+    <string name="about_disclaimer">Картинки и теги принадлежат авторам и сайтам. DudeBooru не связан с Danbooru, Yande.re и Konachan</string>
     <string name="lock_title">DudeBooru заблокирован</string>
     <string name="lock_unlock">Разблокировать</string>
     <string name="lock_prompt_title">Вход в DudeBooru</string>

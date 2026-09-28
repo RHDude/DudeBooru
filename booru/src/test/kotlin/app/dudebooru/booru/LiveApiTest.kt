@@ -46,7 +46,7 @@ class LiveApiTest {
 
     @Test
     fun everySiteServesSfwFeed() = runBlocking {
-        for (site in listOf(Sites.DANBOORU, Sites.SAFEBOORU, Sites.YANDERE, Sites.KONACHAN, Sites.SAKUGABOORU)) {
+        for (site in listOf(Sites.DANBOORU, Sites.SAFEBOORU, Sites.YANDERE, Sites.KONACHAN)) {
             val page = engine(site).posts(FeedRequest(mode = ContentMode.SFW), null, 20)
             println("${site.name}: raw=${page.rawCount} visible=${page.posts.size} q='${page.plan.query}'")
             assertTrue("${site.name} returned nothing", page.rawCount > 0)

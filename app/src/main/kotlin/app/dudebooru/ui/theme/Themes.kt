@@ -105,7 +105,15 @@ object ThemePresets {
         cornerRadius = 16,
     )
 
-    val all = listOf(MONET, CLASSIC, AMOLED, MIKU, MAID, SAKURA)
+    /** Касанэ Тето: красный акцент как её волосы-«дрели», графитовый фон как форма, детали цвета багета. */
+    val TETO = AppTheme(
+        id = "teto", name = "Teto",
+        light = ThemePalette(c(0xFFD2334C), c(0xFFFFF5F5), c(0xFFFFFFFF), detail = c(0xFFB07428)),
+        dark = ThemePalette(c(0xFFF0506A), c(0xFF1A1517), c(0xFF261E21), detail = c(0xFFE3A857)),
+        cornerRadius = 14,
+    )
+
+    val all = listOf(MONET, CLASSIC, AMOLED, MIKU, TETO, MAID, SAKURA)
 
     fun byId(id: String?) = all.firstOrNull { it.id == id }
 }

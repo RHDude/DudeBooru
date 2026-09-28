@@ -82,12 +82,15 @@ data class CensorState(
      * Цензура работает в режимах «NSFW» и «Всё»; посты q/e, по желанию и s.
      * В режиме SFW откровенное приходит только из своих лент (лайки, история, сохранённые) —
      * там оно закрыто всегда, и в ленте, и в просмотре.
+     *
+     * В просмотре правила те же: соседние посты, до которых долистал, и «Случайный пост» закрыты,
+     * пока не нажмёшь. Пост, открытый из ленты, считается показанным ([CensorPrefs.inViewer] —
+     * чтобы закрыт был и он).
      */
-    fun hides(post: Post, inViewer: Boolean = false): Boolean {
+    fun hides(post: Post): Boolean {
         if (post.key in revealed) return false
         if (mode == ContentMode.SFW) return post.rating.isNsfw
         if (!enabled) return false
-        if (inViewer && !prefs.inViewer) return false
         return post.rating.isNsfw || (prefs.blurSensitive && post.rating == Rating.SENSITIVE)
     }
 

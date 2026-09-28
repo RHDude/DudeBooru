@@ -338,6 +338,7 @@ fun PresetCard(theme: AppTheme, dark: Boolean, selected: Boolean, onClick: () ->
 @Composable
 fun presetName(theme: AppTheme): String = when (theme.id) {
     "classic" -> stringResource(R.string.theme_classic)
+    "teto" -> stringResource(R.string.theme_teto)
     else -> theme.name
 }
 

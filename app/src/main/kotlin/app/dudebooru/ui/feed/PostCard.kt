@@ -330,20 +330,7 @@ private fun TapImage(
                 Icon(DudeIcons.Download, stringResource(R.string.post_downloaded), tint = Color.White, modifier = Modifier.padding(4.dp).size(16.dp))
             }
         }
-        if (post.mediaType != MediaType.IMAGE) {
-            Surface(
-                color = Color.Black.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
-            ) {
-                Text(
-                    if (post.mediaType == MediaType.GIF) "GIF" else "▶ " + stringResource(R.string.post_video),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-            }
-        }
+        MediaBadge(post, Modifier.align(Alignment.TopStart).padding(10.dp))
         if (heart.value > 0f) {
             Icon(
                 DudeIcons.HeartFilled,

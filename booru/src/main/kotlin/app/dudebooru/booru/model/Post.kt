@@ -41,6 +41,8 @@ data class Post(
     val pixivId: Long? = null,
     val poolIds: List<Long> = emptyList(),
     val status: PostStatus = PostStatus.ACTIVE,
+    /** Длительность видео в секундах — её отдаёт только Danbooru. */
+    val duration: Double? = null,
 ) {
     val key: String get() = key(site, id)
 

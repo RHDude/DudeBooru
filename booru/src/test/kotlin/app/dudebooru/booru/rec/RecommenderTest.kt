@@ -34,36 +34,80 @@ class RecommenderTest {
         }
     }
 
+    private fun likes(count: Int, make: () -> Post) = (1..count).map { Signal(make(), SignalKind.LIKE, now) }
+
     @Test
     fun commonTagsBarelyMatter() {
-        val profile = TasteProfile.build(listOf(Signal(post(general = listOf("1girl", "twintails")), SignalKind.LIKE, now)), now, idf)
+        val profile = TasteProfile.ofPost(post(general = listOf("1girl", "twintails")), idf)
         assertTrue(profile.weight("twintails") > profile.weight("1girl") * 20)
+    }
+
+    @Test
+    fun commonTagsStayOutOfTheProfile() {
+        val profile = TasteProfile.build(likes(3) { post(general = listOf("1girl", "solo", "twintails")) }, now, idf)
+        assertEquals(0.0, profile.weight("1girl"), 0.0)
+        assertEquals(0.0, profile.weight("solo"), 0.0)
+        assertTrue(profile.weight("twintails") > 0)
+    }
+
+    @Test
+    fun onlyRecurringTagsEnterTheProfile() {
+        val a = post(artist = "artist_a", character = listOf("miku"), general = listOf("hat", "boots"))
+        val b = post(artist = "artist_b", character = listOf("miku"), general = listOf("hat", "scarf"))
+        val profile = TasteProfile.build(listOf(Signal(a, SignalKind.LIKE, now), Signal(b, SignalKind.SAVE, now)), now)
+        assertEquals(setOf("miku", "hat"), profile.top().map { it.name }.toSet())
+    }
+
+    @Test
+    fun likeAndSaveOfOnePostCountOnce() {
+        val p = post(character = listOf("miku"))
+        val profile = TasteProfile.build(listOf(Signal(p, SignalKind.LIKE, now), Signal(p, SignalKind.SAVE, now)), now)
+        assertTrue(profile.isEmpty)
+    }
+
+    @Test
+    fun generalTagsNeedAShareOfLikes() {
+        val signals = likes(3) { post(general = listOf("hat")) } + likes(6) { post(general = listOf("scarf")) } + likes(91) { post(general = emptyList()) }
+        val profile = TasteProfile.build(signals, now)
+        assertEquals(0.0, profile.weight("hat"), 0.0)
+        assertTrue(profile.weight("scarf") > 0)
+    }
+
+    @Test
+    fun notInterestedNeverAddsTags() {
+        val signals = (1..3).map { Signal(post(character = listOf("x")), SignalKind.DISLIKE, now) } +
+            Signal(post(character = listOf("y")), SignalKind.DISLIKE, now)
+        val profile = TasteProfile.build(signals, now)
+        assertTrue(profile.top().isEmpty())
+        assertTrue(profile.weight("x") < 0)
+        assertEquals(0.0, profile.weight("y"), 0.0)
     }
 
     @Test
     fun categoryWeightsAndSaveCountsDouble() {
         val p = post(artist = "artist_x", character = listOf("miku"), copyright = listOf("vocaloid"), general = listOf("smile"))
-        val liked = TasteProfile.build(listOf(Signal(p, SignalKind.LIKE, now)), now)
+        val liked = TasteProfile.build(listOf(Signal(p, SignalKind.LIKE, now)), now, minSupport = 1)
         assertEquals(3.0 / 2.0, liked.weight("artist_x") / liked.weight("miku"), 1e-9)
         assertEquals(2.0 / 1.5, liked.weight("miku") / liked.weight("vocaloid"), 1e-9)
-        val saved = TasteProfile.build(listOf(Signal(p, SignalKind.SAVE, now)), now)
+        val saved = TasteProfile.build(listOf(Signal(p, SignalKind.SAVE, now)), now, minSupport = 1)
         assertEquals(2.0, saved.weight("miku") / liked.weight("miku"), 1e-9)
     }
 
     @Test
     fun likesDecayWithHalfLifeOf60Days() {
         val p = post(character = listOf("miku"))
-        val fresh = TasteProfile.build(listOf(Signal(p, SignalKind.LIKE, now)), now)
-        val old = TasteProfile.build(listOf(Signal(p, SignalKind.LIKE, now - 60 * day)), now)
+        val fresh = TasteProfile.build(listOf(Signal(p, SignalKind.LIKE, now)), now, minSupport = 1)
+        val old = TasteProfile.build(listOf(Signal(p, SignalKind.LIKE, now - 60 * day)), now, minSupport = 1)
         assertEquals(0.5, old.weight("miku") / fresh.weight("miku"), 1e-9)
     }
 
     @Test
     fun notInterestedSubtracts() {
-        val a = post(character = listOf("miku"))
-        val b = post(character = listOf("miku"))
-        val profile = TasteProfile.build(listOf(Signal(a, SignalKind.LIKE, now), Signal(b, SignalKind.DISLIKE, now)), now)
-        assertEquals(0.0, profile.weight("miku"), 1e-9)
+        val liked = likes(2) { post(character = listOf("miku")) }
+        val disliked = Signal(post(character = listOf("miku")), SignalKind.DISLIKE, now)
+        val plain = TasteProfile.build(liked, now)
+        val profile = TasteProfile.build(liked + disliked, now)
+        assertEquals(plain.weight("miku") / 2, profile.weight("miku"), 1e-9)
     }
 
     /** Приёмка ТЗ: после 20 лайков по одному персонажу он заметно преобладает, у каждого поста есть причина. */
@@ -86,7 +130,7 @@ class RecommenderTest {
 
     @Test
     fun excludesSeenLikedSaved() {
-        val profile = TasteProfile.build(listOf(Signal(post(character = listOf("miku")), SignalKind.LIKE, now)), now)
+        val profile = TasteProfile.build(likes(2) { post(character = listOf("miku")) }, now)
         val seen = post(character = listOf("miku"))
         val fresh = post(character = listOf("miku"))
         val ranked = Recommender.rank(listOf(seen, fresh), profile, exclude = setOf(seen.key), exploreShare = 0.0)
@@ -95,7 +139,7 @@ class RecommenderTest {
 
     @Test
     fun noMoreThanTwoOfOneArtistInARow() {
-        val profile = TasteProfile.build(listOf(Signal(post(artist = "star"), SignalKind.LIKE, now)), now)
+        val profile = TasteProfile.build(likes(2) { post(artist = "star") }, now)
         val list = (1..5).map { post(artist = "star") } + (1..3).map { post(artist = "other_$it") }
         val ranked = Recommender.rank(list, profile, exploreShare = 0.0)
         val artists = ranked.map { it.post.tags.artist.first() }
@@ -107,7 +151,7 @@ class RecommenderTest {
 
     @Test
     fun exploreShareRoughly15Percent() {
-        val profile = TasteProfile.build(listOf(Signal(post(character = listOf("miku")), SignalKind.LIKE, now)), now, idf)
+        val profile = TasteProfile.build(likes(2) { post(character = listOf("miku")) }, now, idf)
         val candidates = (1..85).map { post(character = listOf("miku")) } + (1..50).map { post(character = listOf("x$it")) }
         val ranked = Recommender.rank(candidates, profile, random = Random(3))
         val share = ranked.count { it.explore }.toDouble() / ranked.size
@@ -116,7 +160,7 @@ class RecommenderTest {
 
     @Test
     fun queriesFromTopTags() {
-        val signals = listOf(Signal(post(artist = "artist_x", character = listOf("miku"), copyright = listOf("vocaloid"), general = listOf("twintails", "smile", "hat", "boots")), SignalKind.LIKE, now))
+        val signals = likes(2) { post(artist = "artist_x", character = listOf("miku"), copyright = listOf("vocaloid"), general = listOf("twintails", "smile", "hat", "boots")) }
         val queries = Recommender.queries(TasteProfile.build(signals, now))
         assertTrue(queries.any { it.tags == listOf("artist_x") && it.kind == CandidateQuery.Kind.ARTIST_NEW })
         assertTrue(queries.any { it.tags == listOf("miku") })

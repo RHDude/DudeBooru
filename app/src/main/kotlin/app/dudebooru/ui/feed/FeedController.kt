@@ -16,7 +16,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -91,6 +94,15 @@ class FeedController(
 
     val listState = LazyListState()
     val gridState = LazyGridState()
+
+    private val _scrollTop = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** Просьба ленте вернуться наверх — тап по уже открытой папке. */
+    val scrollTop: SharedFlow<Unit> = _scrollTop.asSharedFlow()
+
+    fun requestScrollTop() {
+        _scrollTop.tryEmit(Unit)
+    }
 
     val supportedSorts: List<SortOrder> get() = c.registry.engine(site).supportedSorts
 

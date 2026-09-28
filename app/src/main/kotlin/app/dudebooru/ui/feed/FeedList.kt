@@ -102,6 +102,19 @@ fun FeedList(
     val scope = rememberCoroutineScope()
     val showHiddenMark = LocalFeedPrefs.current.showHiddenCount
 
+    // Наверх по тапу на открытую папку: издалека сначала прыжок поближе, чтобы не мотать сотни карточек.
+    LaunchedEffect(controller, grid) {
+        controller.scrollTop.collect {
+            if (grid) {
+                if (gridState.firstVisibleItemIndex > 30) gridState.scrollToItem(12)
+                gridState.animateScrollToItem(0)
+            } else {
+                if (listState.firstVisibleItemIndex > 6) listState.scrollToItem(3)
+                listState.animateScrollToItem(0)
+            }
+        }
+    }
+
     // Следующая порция — заранее, на 70% прокрутки.
     LaunchedEffect(controller, grid) {
         snapshotFlow {
@@ -341,6 +354,7 @@ private fun GridCell(item: FeedItem, onClick: () -> Unit, onLongClick: () -> Uni
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        MediaBadge(item.lead, Modifier.align(Alignment.TopStart).padding(4.dp), small = true)
         if (item.posts.size > 1) {
             Surface(
                 color = Color.Black.copy(alpha = 0.5f),
