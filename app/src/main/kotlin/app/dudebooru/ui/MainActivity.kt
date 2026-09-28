@@ -42,7 +42,6 @@ import app.dudebooru.DudeApp
 import app.dudebooru.R
 import app.dudebooru.booru.model.TagCategory
 import app.dudebooru.data.settings.ThemeMode
-import app.dudebooru.ui.accounts.AccountsScreen
 import app.dudebooru.ui.accounts.AccountsViewModel
 import app.dudebooru.ui.feed.Collections
 import app.dudebooru.ui.feed.CensorState
@@ -299,15 +298,16 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                             val controller = vm.controller(route.controllerId) ?: return@CompositionLocalProvider
                             ArtistScreen(vm, controller, route.name, actions, onBack = { vm.back() })
                         }
-                        Route.Settings -> {
+                        is Route.Settings -> {
+                            // Одна модель на все разделы: формы входа и черновики не теряются при переходах.
                             val accountsVm = viewModel { AccountsViewModel(context.applicationContext as android.app.Application, vm.c) }
-                            AccountsScreen(
-                                accountsVm,
+                            app.dudebooru.ui.settings.SettingsScreen(
+                                vm = accountsVm,
+                                page = route.page,
                                 onBack = { vm.back() },
-                                onOpenNegativeTags = { vm.navigate(Route.NegativeTags) },
-                                onOpenThemes = { vm.navigate(Route.Themes) },
-                                onOpenIcons = { vm.navigate(Route.IconPicker) },
-                                onOpenGame = { vm.navigate(Route.Game) },
+                                onOpen = vm::navigate,
+                                mode = mode,
+                                onMode = vm::setMode,
                                 updates = vm.updates,
                                 onAskNotifications = actions::askNotifications,
                             )
@@ -315,7 +315,7 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                         Route.NegativeTags -> NegativeTagsScreen(vm, onBack = { vm.back() })
                         is Route.Soon -> SoonScreen(route.title, route.step, onBack = { vm.back() })
                         Route.Saved -> SavedScreen(vm, actions, onBack = { vm.back() })
-                        Route.Profile -> ProfileScreen(vm, actions, onBack = { vm.back() }, onEdit = { vm.navigate(Route.Settings) })
+                        Route.Profile -> ProfileScreen(vm, actions, onBack = { vm.back() }, onEdit = { vm.navigate(Route.Settings(app.dudebooru.ui.main.SettingsPage.PROFILE)) })
                         Route.History -> HistoryScreen(vm, actions, onBack = { vm.back() })
                         Route.Artists -> ArtistsScreen(vm, onBack = { vm.back() })
                         Route.Downloads -> DownloadsScreen(vm, onBack = { vm.back() })

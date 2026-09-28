@@ -59,6 +59,16 @@ object DudeIcons {
     val BellRing = stroke("BellRing", BELL + "M3,9.5a9,9 0 0,1 2.4,-5M21,9.5a9,9 0 0,0 -2.4,-5")
     val BellOff = stroke("BellOff", BELL + "M4,4L20,20")
 
+    // Разделы настроек.
+    val Key = stroke("Key", circle(7.5f, 12f, 4f) + "M11.5,12H21v3.5M17.5,12v2.5")
+    val Shield = stroke("Shield", "M12,3l7.5,3v5.5c0,4.6 -3.2,8.3 -7.5,9.5 -4.3,-1.2 -7.5,-4.9 -7.5,-9.5V6zM8.8,12l2.2,2.2 4.2,-4.4")
+    val Feed = stroke("Feed", "M6,3h12a2,2 0 0,1 2,2v7a2,2 0 0,1 -2,2H6a2,2 0 0,1 -2,-2V5a2,2 0 0,1 2,-2zM4,18h16M4,21h10")
+    val Globe = stroke("Globe", circle(12f, 12f, 9f) + "M3,12h18M12,3a14,14 0 0,1 0,18a14,14 0 0,1 0,-18z")
+    val Info = stroke("Info", circle(12f, 12f, 9f) + "M12,11v5.5" + circle(12f, 7.7f, 0.3f))
+    val Translate = stroke("Translate", "M3.5,6h9M8,4v2M10.5,6c-0.8,3.8 -3.1,6.7 -6.5,8.5M5.8,9.6c1.1,1.9 2.8,3.4 4.9,4.4M12.5,21l4,-9 4,9M14,17.6h5")
+    val Folder = stroke("Folder", "M3.5,7.5a2,2 0 0,1 2,-2h3.8l2,2.2h7.2a2,2 0 0,1 2,2v7.8a2,2 0 0,1 -2,2h-13a2,2 0 0,1 -2,-2z")
+    val ChevronRight = stroke("ChevronRight", "M9.5,6l6,6 -6,6")
+
     // ---------------------------------------------------------------------------------------
 
     private const val BELL = "M6,16v-5a6,6 0 0,1 12,0v5l1.5,2h-15zM10,20.5a2,2 0 0,0 4,0"

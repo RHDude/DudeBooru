@@ -78,7 +78,7 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
                 // --- шапка ---
                 Box(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 20.dp, bottom = 8.dp)) {
                     Column {
-                        Avatar(profile?.avatarUrl, Modifier.size(64.dp).clickable { onNavigate(Route.Settings) })
+                        Avatar(profile?.avatarUrl, Modifier.size(64.dp).clickable { onNavigate(Route.Settings(SettingsPage.PROFILE)) })
                         Spacer(Modifier.height(12.dp))
                         Text(profile.displayName(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Row(
@@ -138,7 +138,7 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
                             }
                         }
                         Row(
-                            Modifier.fillMaxWidth().clickable { onNavigate(Route.Settings) }.padding(horizontal = 14.dp, vertical = 12.dp),
+                            Modifier.fillMaxWidth().clickable { onNavigate(Route.Settings(SettingsPage.ACCOUNTS)) }.padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(DudeIcons.Plus, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -199,7 +199,7 @@ fun DudeDrawer(vm: MainViewModel, dark: Boolean, onNavigate: (Route) -> Unit, on
                 DrawerItem(DudeIcons.Hide, R.string.drawer_negative_tags) { onNavigate(Route.NegativeTags) }
                 HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 6.dp))
                 DrawerItem(DudeIcons.Palette, R.string.drawer_themes) { onNavigate(Route.Themes) }
-                DrawerItem(DudeIcons.Gear, R.string.drawer_settings) { onNavigate(Route.Settings) }
+                DrawerItem(DudeIcons.Gear, R.string.drawer_settings) { onNavigate(Route.Settings()) }
                 // Вышла новая версия — пункт появляется сам, тап открывает «что нового» и установку.
                 val update by vm.updates.state.collectAsStateWithLifecycle()
                 (update as? app.dudebooru.ui.update.UpdateState.Available)?.let { available ->

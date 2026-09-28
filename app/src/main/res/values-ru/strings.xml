@@ -44,7 +44,7 @@
     <string name="menu">Меню</string>
     <string name="post_actions">Действия с постом</string>
     <string name="censor_tap_to_show">NSFW · нажмите, чтобы показать</string>
-    <string name="settings_content">Контент</string>
+    <string name="settings_content">Контент и цензура</string>
     <string name="settings_censor">Цензура NSFW</string>
     <string name="censor_style_spoiler">Спойлер</string>
     <string name="censor_style_blur">Размытие</string>
@@ -148,9 +148,8 @@
     <string name="mirror_likes_hint">Лайк станет голосом «за» и публично изменит score поста. Новым аккаунтам Danbooru даёт мало голосов — они уходят из очереди.</string>
     <string name="import_favorites_done">Из избранного в «Сохранённые»: %1$d</string>
     <string name="settings_downloads">Скачивание</string>
-    <string name="dl_folder">Папка: %1$s</string>
+    <string name="dl_folder">Папка для загрузок</string>
     <string name="dl_folder_default">Pictures (по умолчанию)</string>
-    <string name="dl_folder_pick">Выбрать папку</string>
     <string name="dl_folder_reset">По умолчанию</string>
     <string name="dl_template">Шаблон имени</string>
     <string name="dl_template_preview">Будет: %1$s</string>
@@ -462,7 +461,7 @@
     <string name="onb_drag">Перетащить</string>
     <string name="onb_look_title">Вид</string>
     <string name="onb_look_monet">Monet</string>
-    <string name="onb_accounts_hint">Войти в аккаунты можно в Настройки → Аккаунты и профиль, это снимет часть ограничений сайтов</string>
+    <string name="onb_accounts_hint">Войти в аккаунты можно в Настройки → Аккаунты, это снимет часть ограничений сайтов</string>
 
     <!-- Профиль -->
     <string name="profile_default_name">Чувак</string>
@@ -511,6 +510,43 @@
     <string name="update_allow_install">Разрешите DudeBooru устанавливать приложения и нажмите «Скачать и установить» ещё раз</string>
     <string name="update_foreign_signature">Файл подписан другим ключом — установить его поверх этой версии нельзя. Скачайте выпуск с GitHub вручную</string>
     <string name="drawer_update">Обновить до %1$s</string>
+
+    <!-- Разделы настроек -->
+    <string name="settings_profile_hint">Имя, ник и аватарка</string>
+    <string name="settings_accounts">Аккаунты</string>
+    <string name="settings_accounts_hint">Вход на сайты и синхронизация избранного</string>
+    <string name="settings_accounts_signed_in">Вход выполнен: %1$s</string>
+    <string name="settings_accounts_invalid">Нужно войти заново: %1$s</string>
+    <string name="settings_feed_hint">Посты или сетка, двойной тап, GIF</string>
+    <string name="settings_content_censor_on">%1$s · NSFW под цензурой</string>
+    <string name="settings_content_censor_off">%1$s · без цензуры</string>
+    <string name="settings_look_hint">Темы, иконка приложения, язык</string>
+    <string name="settings_notifications_hint">Новые работы художников, обновления</string>
+    <string name="settings_notifications_blocked">Выключены в настройках Android</string>
+    <string name="settings_downloads_hint">Папка, имена файлов, только Wi-Fi</string>
+    <string name="settings_network_hint">Прокси и DNS, если сайт не открывается</string>
+    <string name="settings_network_proxy">Прокси: %1$s</string>
+    <string name="settings_feed_layout">Вид ленты</string>
+    <string name="settings_double_tap_hint">Сердечко появляется прямо на картинке</string>
+    <string name="settings_animate_gifs_hint">Выключите, чтобы беречь трафик и батарею</string>
+    <string name="settings_mode">Что показывать</string>
+    <string name="settings_mode_hint">NSFW и «Всё» — только для взрослых. Этот же переключатель есть в боковом меню</string>
+    <string name="settings_censor_group">Цензура</string>
+    <string name="settings_censor_hint">Откровенные картинки закрыты, пока не нажмёте на них</string>
+    <string name="settings_hidden">Скрытое</string>
+    <string name="settings_negative_tags_hint">Посты с этими тегами не показываются</string>
+    <string name="settings_show_hidden_hint">Видно, сколько постов убрали фильтры</string>
+    <string name="settings_language">Язык приложения</string>
+    <string name="settings_language_system">Как в системе</string>
+    <string name="notify_updates_hint">Проверка раз в сутки, со списком изменений</string>
+    <string name="notify_system_hint">Звук, вибрация, экран блокировки</string>
+    <string name="notify_blocked">Уведомления DudeBooru выключены в Android. Нажмите, чтобы включить</string>
+    <string name="dl_group_download">Загрузка</string>
+    <string name="dl_wifi_only_hint">Мобильный интернет не тратится</string>
+    <string name="dl_write_tags_hint">Галереи и поиск по файлам находят картинки по тегам</string>
+    <string name="dl_template_vars">Нажмите на переменную — она встанет на место курсора</string>
+    <string name="network_proxy">Прокси</string>
+
     <string name="about_whats_new">Что нового в %1$s</string>
-    <string name="whats_new">• Колокольчик у художника: уведомления о новых работах можно выключить у одного художника, не отписываясь\n• Уведомления о новых работах из подписок и о новых версиях приложения\n• Проверка обновлений и установка новой версии прямо из приложения\n• Английский интерфейс\n• Кнопки под постом крупнее, в стиле Twitter и VK; «детали» в просмотре — рядом с лайком\n• Карусель: картинка другого формата стоит по центру на размытом фоне, без серых полос\n• Сортировка папки переживает перезапуск\n• Название в шапке меняется вместе со свайпом по папкам\n• Поиск по нескольким тегам: набранные слова больше не теряются при выборе подсказки\n• Цензура работает и в «Лайках», «Истории», «Сохранённых»; сила цензуры меняется сразу, с предпросмотром\n• «Случайный пост» готовится заранее и вместо чёрного экрана показывает загрузку или ошибку\n• Профиль в одну прокрутку, «Мои теги» сворачиваются\n• Лента листается плавнее; переходы из бокового меню без рывка\n• Сплэш при запуске в теме приложения (Android 12+)</string>
+    <string name="whats_new">• Настройки разбиты на разделы с иконками: аккаунты, лента, контент, оформление, уведомления, скачивание, сеть, о приложении\n• Боковое меню открывается свайпом вправо в любом месте первой папки\n• Язык приложения — прямо из настроек (Android 13+)\n• Колокольчик у художника: уведомления о новых работах можно выключить у одного художника, не отписываясь\n• Уведомления о новых работах из подписок и о новых версиях приложения\n• Проверка обновлений и установка новой версии прямо из приложения\n• Английский интерфейс\n• Кнопки под постом крупнее, в стиле Twitter и VK; «детали» в просмотре — рядом с лайком\n• Карусель: картинка другого формата стоит по центру на размытом фоне, без серых полос\n• Сортировка папки переживает перезапуск\n• Название в шапке меняется вместе со свайпом по папкам\n• Поиск по нескольким тегам: набранные слова больше не теряются при выборе подсказки\n• Цензура работает и в «Лайках», «Истории», «Сохранённых»; сила цензуры меняется сразу, с предпросмотром\n• «Случайный пост» готовится заранее и вместо чёрного экрана показывает загрузку или ошибку\n• Профиль в одну прокрутку, «Мои теги» сворачиваются\n• Лента листается плавнее; переходы из бокового меню без рывка\n• Сплэш при запуске в теме приложения (Android 12+)</string>
 </resources>

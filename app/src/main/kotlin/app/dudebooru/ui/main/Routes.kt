@@ -9,7 +9,8 @@ sealed interface Route {
     data class Results(val controllerId: String) : Route
     data class Viewer(val controllerId: String, val startKey: String) : Route
     data class Artist(val controllerId: String, val siteId: String, val name: String) : Route
-    data object Settings : Route
+    /** Настройки: без раздела — список разделов. */
+    data class Settings(val page: SettingsPage? = null) : Route
     data object NegativeTags : Route
     data object Saved : Route
     data object Profile : Route
@@ -24,3 +25,6 @@ sealed interface Route {
     data class Similar(val controllerId: String, val post: app.dudebooru.booru.model.Post) : Route
     data class Soon(@StringRes val title: Int, val step: Int) : Route
 }
+
+/** Разделы настроек в порядке списка. */
+enum class SettingsPage { PROFILE, ACCOUNTS, FEED, CONTENT, LOOK, NOTIFICATIONS, DOWNLOADS, NETWORK, ABOUT }

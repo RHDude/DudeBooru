@@ -59,7 +59,8 @@ interface FeedEnvironment {
     val gameRecord: StateFlow<Int>
     fun saveRecord(score: Int)
     fun openNegativeTags()
-    fun openSettings()
+    fun openNetworkSettings()
+    fun openAccountSettings()
     fun openSite(site: SiteConfig)
     suspend fun similarTags(site: SiteConfig, tag: String): List<String>
     fun search(site: SiteConfig, tags: List<String>)
@@ -218,14 +219,14 @@ private fun ErrorButtons(error: Throwable, controller: FeedController) {
     val env = LocalFeedEnv.current
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when (error) {
-            is BooruException.Forbidden -> Button(onClick = { env?.openSettings() }) { Text(stringResource(R.string.error_btn_network)) }
-            is BooruException.Unauthorized -> Button(onClick = { env?.openSettings() }) { Text(stringResource(R.string.error_btn_relogin)) }
+            is BooruException.Forbidden -> Button(onClick = { env?.openNetworkSettings() }) { Text(stringResource(R.string.error_btn_network)) }
+            is BooruException.Unauthorized -> Button(onClick = { env?.openAccountSettings() }) { Text(stringResource(R.string.error_btn_relogin)) }
             is BooruException.NotJson -> Button(onClick = { env?.openSite(controller.site) }) { Text(stringResource(R.string.error_btn_open_site)) }
             else -> Unit
         }
         OutlinedButton(onClick = controller::retry) { Text(stringResource(R.string.retry)) }
         if (error is BooruException.NotResponding) {
-            OutlinedButton(onClick = { env?.openSettings() }) { Text(stringResource(R.string.error_btn_proxy)) }
+            OutlinedButton(onClick = { env?.openNetworkSettings() }) { Text(stringResource(R.string.error_btn_proxy)) }
         }
     }
 }

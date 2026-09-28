@@ -41,7 +41,9 @@ class DudeActions(
 
     override fun openNegativeTags() = vm.navigate(Route.NegativeTags)
 
-    override fun openSettings() = vm.navigate(Route.Settings)
+    override fun openNetworkSettings() = vm.navigate(Route.Settings(app.dudebooru.ui.main.SettingsPage.NETWORK))
+
+    override fun openAccountSettings() = vm.navigate(Route.Settings(app.dudebooru.ui.main.SettingsPage.ACCOUNTS))
 
     override fun openSite(site: app.dudebooru.booru.site.SiteConfig) {
         runCatching {
