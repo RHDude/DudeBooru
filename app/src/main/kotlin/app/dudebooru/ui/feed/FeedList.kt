@@ -180,7 +180,7 @@ fun FeedList(
                     GridCell(
                         item = item,
                         onClick = { actions.open(controller, item.lead) },
-                        onLongClick = { onLongPress?.invoke(item.lead) ?: actions.download(item.lead, original = true) },
+                        onLongClick = { onLongPress?.invoke(item.lead) ?: actions.quickActions(item.lead, item.posts) },
                     )
                 }
                 if (state.items.isEmpty() && state.loading) {
@@ -381,7 +381,7 @@ private fun SkeletonCard() {
 @Composable
 fun PlanRow(plan: QueryPlan) {
     val outline = MaterialTheme.colorScheme.outline
-    val hidden = setOf("rating:", "order:", "age:", "date:")
+    val hidden = setOf("rating:", "order:", "random:", "age:", "date:")
     val server = plan.serverTerms.filterNot { term -> hidden.any { term.startsWith(it) || term.startsWith("-$it") } }
     if (server.isEmpty() && plan.localTerms.isEmpty()) return
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {

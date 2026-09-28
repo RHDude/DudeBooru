@@ -75,6 +75,47 @@ data class FeedPrefs(
     val showHiddenCount: Boolean = true,
 )
 
+/** Настройки → Просмотр. */
+data class ViewerPrefs(
+    /** Экран не гаснет, пока открыт просмотр. */
+    val keepScreenOn: Boolean = true,
+    /** Клавиши громкости листают посты. */
+    val volumeKeys: Boolean = false,
+    /** Оригинал грузится сразу, а не при зуме. */
+    val originalAtOnce: Boolean = false,
+)
+
+/** Настройки → Приватность. */
+data class PrivacyPrefs(
+    /** Запрет скриншотов и пустое превью в недавних приложениях (FLAG_SECURE). */
+    val secureScreen: Boolean = false,
+    val keepHistory: Boolean = true,
+    /** Вход по отпечатку, лицу или блокировке экрана телефона. */
+    val appLock: Boolean = false,
+)
+
+/** Настройки → Источники и папки. */
+data class FolderPrefs(
+    /** Счётчики новых постов на папках. */
+    val newCounts: Boolean = true,
+    /** Папки листаются свайпом по ленте. */
+    val swipe: Boolean = true,
+)
+
+/** Настройки → Рекомендации. */
+data class RecPrefs(
+    /** Доля постов «на пробу» — вне профиля вкуса. */
+    val exploreShare: Float = DEFAULT_EXPLORE,
+    /** Сохранённые тоже учитываются (с двойным весом). */
+    val useSaved: Boolean = true,
+    /** Сигналы раньше этого момента не учитываются: «Сбросить профиль» ничего не удаляет. */
+    val resetAt: Long = 0L,
+) {
+    companion object {
+        const val DEFAULT_EXPLORE = 0.15f
+    }
+}
+
 /** Локальный профиль: к аккаунтам сайтов не привязан и никуда не отправляется. */
 data class Profile(
     val name: String,
@@ -239,6 +280,65 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     /** Вести историю просмотров (выключается в «Приватности»). */
     val keepHistory: Flow<Boolean> = store.data.map { it[KEEP_HISTORY] ?: true }
+
+    val viewerPrefs: Flow<ViewerPrefs> = store.data.map {
+        ViewerPrefs(
+            keepScreenOn = it[VIEWER_SCREEN_ON] ?: true,
+            volumeKeys = it[VIEWER_VOLUME_KEYS] ?: false,
+            originalAtOnce = it[VIEWER_ORIGINAL] ?: false,
+        )
+    }
+
+    suspend fun setViewerPrefs(value: ViewerPrefs) {
+        store.edit {
+            it[VIEWER_SCREEN_ON] = value.keepScreenOn
+            it[VIEWER_VOLUME_KEYS] = value.volumeKeys
+            it[VIEWER_ORIGINAL] = value.originalAtOnce
+        }
+    }
+
+    val privacyPrefs: Flow<PrivacyPrefs> = store.data.map {
+        PrivacyPrefs(
+            secureScreen = it[PRIVACY_SECURE] ?: false,
+            keepHistory = it[KEEP_HISTORY] ?: true,
+            appLock = it[PRIVACY_LOCK] ?: false,
+        )
+    }
+
+    suspend fun setPrivacyPrefs(value: PrivacyPrefs) {
+        store.edit {
+            it[PRIVACY_SECURE] = value.secureScreen
+            it[KEEP_HISTORY] = value.keepHistory
+            it[PRIVACY_LOCK] = value.appLock
+        }
+    }
+
+    val folderPrefs: Flow<FolderPrefs> = store.data.map {
+        FolderPrefs(newCounts = it[FOLDER_COUNTS] ?: true, swipe = it[FOLDER_SWIPE] ?: true)
+    }
+
+    suspend fun setFolderPrefs(value: FolderPrefs) {
+        store.edit {
+            it[FOLDER_COUNTS] = value.newCounts
+            it[FOLDER_SWIPE] = value.swipe
+        }
+    }
+
+    val recPrefs: Flow<RecPrefs> = store.data.map {
+        RecPrefs(
+            exploreShare = it[REC_EXPLORE] ?: RecPrefs.DEFAULT_EXPLORE,
+            useSaved = it[REC_USE_SAVED] ?: true,
+            resetAt = it[REC_RESET_AT] ?: 0L,
+        )
+    }
+
+    suspend fun setRecPrefs(value: RecPrefs) {
+        store.edit {
+            it[REC_EXPLORE] = value.exploreShare
+            it[REC_USE_SAVED] = value.useSaved
+            it[REC_RESET_AT] = value.resetAt
+        }
+    }
 
     suspend fun setProfile(name: String, nick: String) {
         store.edit {
@@ -431,6 +531,16 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val NOTIFY_UPDATES = androidx.datastore.preferences.core.booleanPreferencesKey("notify_updates")
         val NOTIFIED_VERSION = stringPreferencesKey("notified_version")
         val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
+        val VIEWER_SCREEN_ON = androidx.datastore.preferences.core.booleanPreferencesKey("viewer_screen_on")
+        val VIEWER_VOLUME_KEYS = androidx.datastore.preferences.core.booleanPreferencesKey("viewer_volume_keys")
+        val VIEWER_ORIGINAL = androidx.datastore.preferences.core.booleanPreferencesKey("viewer_original")
+        val PRIVACY_SECURE = androidx.datastore.preferences.core.booleanPreferencesKey("privacy_secure")
+        val PRIVACY_LOCK = androidx.datastore.preferences.core.booleanPreferencesKey("privacy_lock")
+        val FOLDER_COUNTS = androidx.datastore.preferences.core.booleanPreferencesKey("folder_counts")
+        val FOLDER_SWIPE = androidx.datastore.preferences.core.booleanPreferencesKey("folder_swipe")
+        val REC_EXPLORE = androidx.datastore.preferences.core.floatPreferencesKey("rec_explore")
+        val REC_USE_SAVED = androidx.datastore.preferences.core.booleanPreferencesKey("rec_use_saved")
+        val REC_RESET_AT = longPreferencesKey("rec_reset_at")
 
         const val DEFAULT_NICK = "dude"
 

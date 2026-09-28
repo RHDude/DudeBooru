@@ -82,19 +82,20 @@ object QueryPlanner {
         var used = mandatory.size
         if (used > limit) throw BooruException.TagLimitExceeded(siteId, limit, used)
 
-        var sortDropped = false
-        val order = effectiveOrder?.let {
-            if (used + 1 <= limit) {
-                used++
-                it
-            } else {
-                sortDropped = true
-                null
-            }
-        }
-
         val server = mutableListOf<String>()
         val local = mutableListOf<String>()
+        fun claim(term: String) {
+            if (used < limit) {
+                server += term
+                used++
+            } else {
+                local += term
+            }
+        }
+        // Свои теги важнее сортировки: тег, проверяемый у себя, листает ленту страницами вхолостую,
+        // а без сортировки лента просто идёт новыми сверху. Редкие теги сужают выдачу сильнее всего.
+        positives.sortedWith(compareBy<String> { it.contains('*') }.thenBy { postCounts[it] ?: Long.MAX_VALUE / 2 })
+            .forEach(::claim)
         // Группа «или» уходит целиком или целиком проверяется локально.
         if (orGroup.isNotEmpty()) {
             if (used + orGroup.size <= limit) {
@@ -104,18 +105,18 @@ object QueryPlanner {
                 local += orGroup
             }
         }
-        // Редкие теги сужают выдачу сильнее всего, исключения дешевле проверить у себя.
-        val byRarity = positives.sortedWith(
-            compareBy<String> { it.contains('*') }.thenBy { postCounts[it] ?: Long.MAX_VALUE / 2 },
-        )
-        for (term in byRarity + negatives) {
+        var sortDropped = false
+        val order = effectiveOrder?.let {
             if (used < limit) {
-                server += term
                 used++
+                it
             } else {
-                local += term
+                sortDropped = true
+                null
             }
         }
+        // Исключения дешевле всего проверить у себя — они последние в очереди за слотами.
+        negatives.forEach(::claim)
 
         return QueryPlan(
             serverTerms = systemTerms + free + mandatory + listOfNotNull(order) + server,

@@ -80,6 +80,13 @@ class DudeActions(
     /** Пост, для которого открыт лист «Не интересно…». */
     val notInterestedPost = MutableStateFlow<Post?>(null)
 
+    /** Лист быстрых действий по долгому нажатию: пост и его карусель. */
+    val quickPost = MutableStateFlow<Pair<Post, List<Post>>?>(null)
+
+    override fun quickActions(post: Post, group: List<Post>) {
+        quickPost.value = post to group
+    }
+
     private fun site(post: Post) = requireNotNull(c.registry.site(post.site))
     private fun engine(post: Post) = c.registry.engine(site(post))
     private fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()

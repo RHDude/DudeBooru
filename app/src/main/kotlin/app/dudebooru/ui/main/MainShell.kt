@@ -3,6 +3,11 @@
 package app.dudebooru.ui.main
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -153,17 +158,18 @@ private fun MainFolders(vm: MainViewModel, folders: List<SiteConfig>, site: Site
                         scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
                     )
                 } else {
-                    TopAppBarDefaults.centerAlignedTopAppBarColors()
+                    steadyBarColors()
                 },
             )
         },
     ) { padding ->
         androidx.compose.foundation.layout.Column(Modifier.padding(padding).fillMaxSize()) {
             val counts by vm.newCounts().collectAsStateWithLifecycle()
-            FolderChips(
+            val folderPrefs by vm.folderPrefs.collectAsStateWithLifecycle()
+            FolderTabs(
                 folders = folders,
-                selectedId = shown.id,
-                counts = counts,
+                pager = pager,
+                counts = if (folderPrefs.newCounts) counts else emptyMap(),
                 onSelect = vm::select,
                 onMarkSeen = vm::markAllSeen,
                 onHide = vm::hideFolder,
@@ -171,7 +177,7 @@ private fun MainFolders(vm: MainViewModel, folders: List<SiteConfig>, site: Site
                 stateOf = { vm.folderFeed(it).state },
             )
             Box(Modifier.fillMaxSize().nestedScroll(rememberDrawerPull(onOpenDrawer))) {
-                FolderPager(vm, folders, site, actions, pager)
+                FolderPager(vm, folders, site, actions, pager, swipe = folderPrefs.swipe)
                 // На остальных папках свайп вправо листает к предыдущей — меню открывается от края.
                 EdgeSwipe(onOpen = onOpenDrawer, modifier = Modifier.align(Alignment.CenterStart))
             }
@@ -187,6 +193,7 @@ private fun FolderPager(
     site: SiteConfig,
     actions: PostActions,
     pager: androidx.compose.foundation.pager.PagerState,
+    swipe: Boolean,
 ) {
     val index = folders.indexOfFirst { it.id == site.id }.coerceAtLeast(0)
 
@@ -198,7 +205,7 @@ private fun FolderPager(
         }
     }
 
-    HorizontalPager(state = pager, key = { folders[it].id }, beyondViewportPageCount = 0) { page ->
+    HorizontalPager(state = pager, key = { folders[it].id }, beyondViewportPageCount = 0, userScrollEnabled = swipe) { page ->
         val folder = folders[page]
         val controller = vm.folderFeed(folder.id)
         val marks by vm.visitMarks.collectAsStateWithLifecycle()
@@ -211,10 +218,14 @@ private fun FolderPager(
     }
 }
 
+/**
+ * Папки-источники во всю ширину: если помещаются, делят свободное место поровну; если нет — листаются.
+ * Подсветка едет за пальцем вместе с пейджером, а не прыгает после свайпа.
+ */
 @Composable
-private fun FolderChips(
+private fun FolderTabs(
     folders: List<SiteConfig>,
-    selectedId: String,
+    pager: androidx.compose.foundation.pager.PagerState,
     counts: Map<String, Int>,
     onSelect: (String) -> Unit,
     onMarkSeen: (String) -> Unit,
@@ -222,54 +233,149 @@ private fun FolderChips(
     onMove: (String, Int) -> Unit,
     stateOf: (String) -> kotlinx.coroutines.flow.StateFlow<app.dudebooru.ui.feed.FeedState>,
 ) {
-    val listState = rememberLazyListState()
-    val index = folders.indexOfFirst { it.id == selectedId }
-    LaunchedEffect(index) { if (index >= 0) listState.animateScrollToItem(index) }
-    LazyRow(
-        state = listState,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        items(folders, key = { it.id }) { folder ->
-            var menu by remember { mutableStateOf(false) }
-            val selected = folder.id == selectedId
-            Box {
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                    modifier = Modifier.combinedClickable(onClick = { onSelect(folder.id) }, onLongClick = { menu = true }),
-                ) {
-                    Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            folder.name,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+    val scroll = rememberScrollState()
+    val bounds = remember { TabBounds() }
+    val indicator = MaterialTheme.colorScheme.secondaryContainer
+    val density = LocalDensity.current
+    val edge = with(density) { 8.dp.roundToPx() }
+    val gap = with(density) { 4.dp.roundToPx() }
+
+    // Выбранная папка всегда на виду, если все не помещаются.
+    LaunchedEffect(pager.currentPage, bounds.version) {
+        val i = pager.currentPage
+        if (i < bounds.lefts.size && scroll.maxValue > 0) {
+            val center = bounds.lefts[i] + bounds.widths[i] / 2 - bounds.viewport / 2
+            scroll.animateScrollTo(center.toInt().coerceIn(0, scroll.maxValue))
+        }
+    }
+
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val viewport = constraints.maxWidth
+        Layout(
+            content = {
+                folders.forEachIndexed { i, folder ->
+                    androidx.compose.runtime.key(folder.id) {
+                        FolderTab(
+                            folder = folder,
+                            selected = pager.currentPage == i,
+                            count = counts[folder.id] ?: 0,
+                            state = stateOf(folder.id),
+                            onSelect = { onSelect(folder.id) },
+                            onMarkSeen = { onMarkSeen(folder.id) },
+                            onHide = { onHide(folder.id) },
+                            onMove = { delta -> onMove(folder.id, delta) },
                         )
-                        // Ошибка касается только своей папки: на ней маленькая красная точка.
-                        val folderState by remember(folder.id) { stateOf(folder.id) }.collectAsStateWithLifecycle()
-                        if (folderState.error != null) {
-                            Spacer(Modifier.width(6.dp))
-                            Box(
-                                Modifier.size(7.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                    .background(MaterialTheme.colorScheme.error),
-                            )
-                        }
-                        val count = counts[folder.id] ?: 0
-                        if (count > 0) {
-                            Spacer(Modifier.width(6.dp))
-                            CountBadge(if (count >= 99) "99+" else count.toString(), highlighted = selected)
-                        }
                     }
                 }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text(stringResource(R.string.folder_mark_seen)) }, onClick = { menu = false; onMarkSeen(folder.id) })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.folder_move_left)) }, onClick = { menu = false; onMove(folder.id, -1) })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.folder_move_right)) }, onClick = { menu = false; onMove(folder.id, 1) })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.folder_hide)) }, onClick = { menu = false; onHide(folder.id) })
-                }
+            },
+            modifier = Modifier
+                .horizontalScroll(scroll)
+                .drawBehind {
+                    val n = bounds.lefts.size
+                    if (n == 0) return@drawBehind
+                    val position = (pager.currentPage + pager.currentPageOffsetFraction).coerceIn(0f, (n - 1).toFloat())
+                    val i = position.toInt().coerceAtMost(n - 1)
+                    val j = (i + 1).coerceAtMost(n - 1)
+                    val f = position - i
+                    val left = bounds.lefts[i] + (bounds.lefts[j] - bounds.lefts[i]) * f
+                    val width = bounds.widths[i] + (bounds.widths[j] - bounds.widths[i]) * f
+                    val h = size.height - 8.dp.toPx()
+                    drawRoundRect(
+                        color = indicator,
+                        topLeft = androidx.compose.ui.geometry.Offset(left, 4.dp.toPx()),
+                        size = androidx.compose.ui.geometry.Size(width, h),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2),
+                    )
+                },
+        ) { measurables, constraints ->
+            val natural = measurables.map { it.maxIntrinsicWidth(constraints.maxHeight) }
+            val used = natural.sum() + gap * (natural.size - 1).coerceAtLeast(0) + edge * 2
+            val extra = if (used < viewport && natural.isNotEmpty()) (viewport - used) / natural.size else 0
+            val placeables = measurables.mapIndexed { i, m ->
+                val w = natural[i] + extra
+                m.measure(Constraints(minWidth = w, maxWidth = w, minHeight = 0, maxHeight = constraints.maxHeight))
             }
+            val height = placeables.maxOfOrNull { it.height } ?: 0
+            var x = edge
+            val lefts = FloatArray(placeables.size)
+            val widths = FloatArray(placeables.size)
+            placeables.forEachIndexed { i, p ->
+                lefts[i] = x.toFloat()
+                widths[i] = p.width.toFloat()
+                x += p.width + gap
+            }
+            val total = maxOf(viewport, x - gap + edge)
+            bounds.update(lefts, widths, viewport.toFloat())
+            layout(total, height + with(density) { 8.dp.roundToPx() }) {
+                placeables.forEachIndexed { i, p -> p.placeRelative(lefts[i].toInt(), with(density) { 4.dp.roundToPx() }) }
+            }
+        }
+    }
+}
+
+/** Где стоят вкладки: пишется при раскладке, читается при рисовании подсветки. */
+private class TabBounds {
+    var lefts = FloatArray(0)
+        private set
+    var widths = FloatArray(0)
+        private set
+    var viewport = 0f
+        private set
+    var version by mutableStateOf(0)
+        private set
+
+    fun update(lefts: FloatArray, widths: FloatArray, viewport: Float) {
+        val changed = !lefts.contentEquals(this.lefts) || !widths.contentEquals(this.widths)
+        this.lefts = lefts
+        this.widths = widths
+        this.viewport = viewport
+        if (changed) androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { version++ }
+    }
+}
+
+@Composable
+private fun FolderTab(
+    folder: SiteConfig,
+    selected: Boolean,
+    count: Int,
+    state: kotlinx.coroutines.flow.StateFlow<app.dudebooru.ui.feed.FeedState>,
+    onSelect: () -> Unit,
+    onMarkSeen: () -> Unit,
+    onHide: () -> Unit,
+    onMove: (Int) -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .combinedClickable(onClick = onSelect, onLongClick = { menu = true })
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                folder.name,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+            )
+            // Ошибка касается только своей папки: на ней маленькая красная точка.
+            val folderState by state.collectAsStateWithLifecycle()
+            if (folderState.error != null) {
+                Spacer(Modifier.width(6.dp))
+                Box(Modifier.size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.error))
+            }
+            if (count > 0) {
+                Spacer(Modifier.width(6.dp))
+                CountBadge(if (count >= 99) "99+" else count.toString(), highlighted = selected)
+            }
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.folder_mark_seen)) }, onClick = { menu = false; onMarkSeen() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.folder_move_left)) }, onClick = { menu = false; onMove(-1) })
+            DropdownMenuItem(text = { Text(stringResource(R.string.folder_move_right)) }, onClick = { menu = false; onMove(1) })
+            DropdownMenuItem(text = { Text(stringResource(R.string.folder_hide)) }, onClick = { menu = false; onHide() })
         }
     }
 }

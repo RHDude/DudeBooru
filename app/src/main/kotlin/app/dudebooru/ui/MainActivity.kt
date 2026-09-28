@@ -24,6 +24,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -73,6 +74,9 @@ import app.dudebooru.ui.theme.LocalTagColors
 import app.dudebooru.ui.viewer.ViewerScreen
 import kotlin.system.exitProcess
 
+/** Сколько приложение может пробыть в фоне, прежде чем снова спросить отпечаток. */
+private const val LOCK_AFTER_MS = 60_000L
+
 /** Файл темы из чужого приложения ждёт, пока соберётся интерфейс. */
 private val incomingTheme = kotlinx.coroutines.flow.MutableStateFlow<android.net.Uri?>(null)
 
@@ -86,6 +90,76 @@ private sealed interface OpenRequest {
 private val incomingOpen = kotlinx.coroutines.flow.MutableStateFlow<OpenRequest?>(null)
 
 class MainActivity : ComponentActivity() {
+    /** Блокировка: снимается входом и возвращается, если приложение пробыло в фоне дольше минуты. */
+    private val locked = kotlinx.coroutines.flow.MutableStateFlow(true)
+    private var stoppedAt = 0L
+
+    /** Android 8–9: подтверждение PIN, пароля или отпечатка системным экраном блокировки. */
+    private val confirmCredential = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) {
+        if (it.resultCode == RESULT_OK) locked.value = false
+    }
+
+    override fun onStop() {
+        super.onStop()
+        stoppedAt = android.os.SystemClock.elapsedRealtime()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (stoppedAt != 0L && android.os.SystemClock.elapsedRealtime() - stoppedAt > LOCK_AFTER_MS) locked.value = true
+    }
+
+    /** Клавиши громкости листают посты в просмотре, если это включено (Настройки → Просмотр). */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        val volume = event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN || event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
+        if (volume && app.dudebooru.ui.viewer.VolumeKeys.active) {
+            if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                app.dudebooru.ui.viewer.VolumeKeys.press(if (event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN) 1 else -1)
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /** Отпечаток, лицо или PIN телефона: Android 10+ — BiometricPrompt, раньше — системный экран блокировки. */
+    private fun unlock() {
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+        // Блокировку экрана в системе сняли — не запираем человека в приложении.
+        if (keyguard?.isDeviceSecure != true) {
+            locked.value = false
+            return
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val builder = android.hardware.biometrics.BiometricPrompt.Builder(this)
+                .setTitle(getString(R.string.lock_prompt_title))
+                .setSubtitle(getString(R.string.lock_prompt_subtitle))
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                builder.setAllowedAuthenticators(
+                    android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                        android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                builder.setDeviceCredentialAllowed(true)
+            }
+            runCatching {
+                builder.build().authenticate(
+                    android.os.CancellationSignal(),
+                    mainExecutor,
+                    object : android.hardware.biometrics.BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: android.hardware.biometrics.BiometricPrompt.AuthenticationResult?) {
+                            locked.value = false
+                        }
+                    },
+                )
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val intent = keyguard.createConfirmDeviceCredentialIntent(getString(R.string.lock_prompt_title), getString(R.string.lock_prompt_subtitle))
+            if (intent == null) locked.value = false else runCatching { confirmCredential.launch(intent) }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -141,15 +215,32 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     val onboarded by vm.onboarded.collectAsStateWithLifecycle()
-                    when (onboarded) {
-                        null -> Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
-                        false -> {
-                            val folders by vm.c.settings.folders.collectAsStateWithLifecycle(null)
-                            folders?.let { f ->
-                                OnboardingScreen(f.order, f.hidden) { choice -> vm.applyOnboarding(context, choice) }
-                            }
+                    val privacy by vm.privacyPrefs.collectAsStateWithLifecycle()
+                    val isLocked by locked.collectAsStateWithLifecycle()
+                    // Приватность: запрет скриншотов и пустое превью в недавних.
+                    LaunchedEffect(privacy?.secureScreen) {
+                        if (privacy?.secureScreen == true) {
+                            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                        } else {
+                            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
                         }
-                        true -> DudeRoot(vm, dark, onCloseApp = ::closeApp)
+                    }
+                    // Блокировку только что включили в настройках — не запираем сразу, только после фона.
+                    LaunchedEffect(privacy?.appLock) { if (privacy?.appLock == false) locked.value = false }
+                    Box(Modifier.fillMaxSize()) {
+                        when {
+                            onboarded == null || privacy == null -> Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
+                            onboarded == false -> {
+                                val folders by vm.c.settings.folders.collectAsStateWithLifecycle(null)
+                                folders?.let { f ->
+                                    OnboardingScreen(f.order, f.hidden) { choice -> vm.applyOnboarding(context, choice) }
+                                }
+                            }
+                            else -> DudeRoot(vm, dark, onCloseApp = ::closeApp)
+                        }
+                        if (privacy?.appLock == true && isLocked) {
+                            app.dudebooru.ui.face.LockScreen(onUnlock = ::unlock, onLeave = ::finish)
+                        }
                     }
                     val pending by vm.pendingTheme.collectAsStateWithLifecycle()
                     pending?.let { t ->
@@ -220,6 +311,7 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
     val censorPrefs by vm.censorPrefs.collectAsStateWithLifecycle()
     val revealed by vm.revealed.collectAsStateWithLifecycle()
     val mode by vm.mode.collectAsStateWithLifecycle()
+    val viewerPrefs by vm.viewerPrefs.collectAsStateWithLifecycle()
     val activity = context as? ComponentActivity
 
     CompositionLocalProvider(
@@ -230,6 +322,7 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
         LocalDownloaded provides downloaded,
         app.dudebooru.ui.feed.LocalFeedEnv provides actions,
         app.dudebooru.ui.common.LocalSharedKey provides vm.sharedKey,
+        app.dudebooru.ui.viewer.LocalViewerPrefs provides viewerPrefs,
     ) {
         Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
             BackHandler { if (!vm.back()) activity?.finish() }
@@ -338,6 +431,10 @@ private fun DudeRoot(vm: MainViewModel, dark: Boolean, onCloseApp: () -> Unit) {
                 }
             }
             NotInterestedSheet(actions)
+            val quick by actions.quickPost.collectAsStateWithLifecycle()
+            quick?.let { (post, group) ->
+                app.dudebooru.ui.feed.PostQuickSheet(post, group, actions, onDismiss = { actions.quickPost.value = null })
+            }
             AdultDialog(vm)
             app.dudebooru.ui.update.UpdateDialog(vm.updates)
             // Тап по уведомлению: к художнику, в «Художники» или в окно обновления.

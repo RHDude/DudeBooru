@@ -18,6 +18,7 @@ class DudeApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        app.dudebooru.data.CrashLog.install(this)
         container = AppContainer(this)
     }
 

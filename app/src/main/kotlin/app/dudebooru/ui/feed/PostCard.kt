@@ -241,6 +241,7 @@ private fun TapImage(
     val actions = LocalPostActions.current
     val heart = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     Box(
         Modifier
             .fillMaxWidth()
@@ -250,8 +251,11 @@ private fun TapImage(
             .pointerInput(post.key) {
                 detectTapGestures(
                     onTap = { onTap(post) },
-                    // Оригинал за два касания: долгое нажатие на превью.
-                    onLongPress = { actions?.download(post, original = true) },
+                    // Долгое нажатие — лист быстрых действий: оригинал там за два касания.
+                    onLongPress = {
+                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        actions?.quickActions(post)
+                    },
                     onDoubleTap = double@{
                         if (!prefs.doubleTapLike) return@double
                         onDoubleTap(post)

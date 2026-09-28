@@ -59,6 +59,14 @@ import app.dudebooru.ui.feed.FeedList
 import app.dudebooru.ui.feed.PostActions
 import app.dudebooru.ui.icons.DudeIcons
 
+/**
+ * Шапка одного цвета с экраном и при прокрутке: по умолчанию Material 3 подкрашивает её
+ * в тон поверхности, и над лентой она заметно светлеет.
+ */
+@Composable
+fun steadyBarColors(color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.background) =
+    TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = color, scrolledContainerColor = color)
+
 /** Результаты поиска — лентой поверх текущей, с той же кнопкой сортировки. */
 @Composable
 fun ResultsScreen(controller: FeedController, actions: PostActions, onBack: () -> Unit, onEditQuery: () -> Unit) {
@@ -81,6 +89,7 @@ fun ResultsScreen(controller: FeedController, actions: PostActions, onBack: () -
                     IconButton(onClick = onEditQuery) { Icon(DudeIcons.Search, stringResource(R.string.search)) }
                 },
                 scrollBehavior = scrollBehavior,
+                colors = steadyBarColors(),
             )
         },
     ) { padding ->

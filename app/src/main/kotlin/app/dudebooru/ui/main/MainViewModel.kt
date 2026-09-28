@@ -20,6 +20,9 @@ import app.dudebooru.data.db.ViewHistoryEntity
 import kotlinx.coroutines.flow.Flow
 import app.dudebooru.data.settings.CensorPrefs
 import app.dudebooru.data.settings.FeedPrefs
+import app.dudebooru.data.settings.FolderPrefs
+import app.dudebooru.data.settings.PrivacyPrefs
+import app.dudebooru.data.settings.ViewerPrefs
 import app.dudebooru.data.settings.Profile
 import app.dudebooru.data.settings.ThemeMode
 import app.dudebooru.ui.theme.AppTheme
@@ -95,6 +98,14 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
     private val lastSeen: StateFlow<Map<String, Long>> = c.settings.lastSeen.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     val feedPrefs: StateFlow<FeedPrefs> = c.settings.feedPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, FeedPrefs())
+    val viewerPrefs: StateFlow<ViewerPrefs> =
+        c.settings.viewerPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, ViewerPrefs())
+    val folderPrefs: StateFlow<FolderPrefs> =
+        c.settings.folderPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, FolderPrefs())
+
+    /** null — ещё читается: блокировка не должна мигнуть содержимым до первого кадра. */
+    val privacyPrefs: StateFlow<PrivacyPrefs?> =
+        c.settings.privacyPrefs.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Отметка прошлого визита, снятая на старте: разделитель «Новое» не уезжает, пока листаешь. */
     private val _visitMarks = MutableStateFlow<Map<String, Long>>(emptyMap())
