@@ -17,7 +17,7 @@ media3 = "1.11.1"
 work = "2.12.0"
 documentfile = "1.1.0"
 junit = "4.13.2"
-kover = "0.9.3"
+kover = "0.9.11"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
