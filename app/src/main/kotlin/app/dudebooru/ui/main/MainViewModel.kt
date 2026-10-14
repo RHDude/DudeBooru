@@ -85,8 +85,12 @@ class MainViewModel(app: Application, val c: AppContainer) : AndroidViewModel(ap
     val saved: StateFlow<Set<String>> = c.db.collections().savedKeys().map { it.toSet() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
-    /** Папки = источники. В режиме NSFW Safebooru скрывается сама. */
-    val folders: StateFlow<List<SiteConfig>> = combine(c.settings.folders, mode) { folders, mode ->
+    /**
+     * Папки = источники. В режиме NSFW Safebooru скрывается сама.
+     * Режим берётся прямо из настроек, а не из [mode]: у того стартовое значение SFW, и при запуске в NSFW
+     * папки на миг приходили с Safebooru, а потом без неё — пейджер, открытый на последней папке, падал.
+     */
+    val folders: StateFlow<List<SiteConfig>> = combine(c.settings.folders, c.settings.contentMode) { folders, mode ->
         folders.order.mapNotNull { c.registry.site(it) }
             .filter { it.id !in folders.hidden }
             .filter { !(mode == ContentMode.NSFW && it.safeOnly) }

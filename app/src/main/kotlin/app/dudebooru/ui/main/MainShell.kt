@@ -209,14 +209,17 @@ private fun FolderPager(
 
     // Тап по папке → листаем пейджер; свайп пейджера → выбираем папку.
     LaunchedEffect(index) { if (pager.currentPage != index) pager.animateScrollToPage(index) }
+    // Папку скрыли или сменился режим: список стал другим — сразу встаём на выбранную, без пролистывания.
+    LaunchedEffect(folders) { if (pager.currentPage != index) pager.scrollToPage(index) }
     LaunchedEffect(pager, folders) {
         snapshotFlow { pager.settledPage }.distinctUntilChanged().collect { page ->
             folders.getOrNull(page)?.let { if (it.id != vm.selected.value) vm.select(it.id) }
         }
     }
 
-    HorizontalPager(state = pager, key = { folders[it].id }, beyondViewportPageCount = 0, userScrollEnabled = swipe) { page ->
-        val folder = folders[page]
+    // Число страниц и ключи могут на кадр разойтись, пока список папок меняется: индекс за краем не роняет приложение.
+    HorizontalPager(state = pager, key = { folders.getOrNull(it)?.id ?: it }, beyondViewportPageCount = 0, userScrollEnabled = swipe) { page ->
+        val folder = folders.getOrNull(page) ?: return@HorizontalPager
         val controller = vm.folderFeed(folder.id)
         val marks by vm.visitMarks.collectAsStateWithLifecycle()
         FeedList(
