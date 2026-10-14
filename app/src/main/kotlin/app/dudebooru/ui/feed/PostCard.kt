@@ -193,8 +193,8 @@ private fun Carousel(
         }
     }
     Box(Modifier.fillMaxWidth().height(height)) {
-        HorizontalPager(state = pager, key = { item.posts[it].key }, modifier = Modifier.fillMaxSize().nestedScroll(blockParent)) { index ->
-            val post = item.posts[index]
+        HorizontalPager(state = pager, key = { item.posts.getOrNull(it)?.key ?: it }, modifier = Modifier.fillMaxSize().nestedScroll(blockParent)) { index ->
+            val post = item.posts.getOrNull(index) ?: return@HorizontalPager
             // Высота карточки — по первой картинке; остальные вписываются, чтобы не резать.
             TapImage(post, height, isLong = false, placeholder, onTap, onDoubleTap, fit = index > 0)
         }

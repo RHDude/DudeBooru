@@ -26,10 +26,18 @@ object CrashLog {
         val app = context.applicationContext
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            runCatching { append(app, thread, error) }
+            // Вылет в кадре Compose приходил сюда дважды тем же объектом — в журнале было два одинаковых
+            // отчёта с одной секундой. Тот же объект ошибки пишем один раз.
+            if (lastLogged?.get() !== error) {
+                lastLogged = java.lang.ref.WeakReference(error)
+                runCatching { append(app, thread, error) }
+            }
             previous?.uncaughtException(thread, error)
         }
     }
+
+    @Volatile
+    private var lastLogged: java.lang.ref.WeakReference<Throwable>? = null
 
     private fun append(context: Context, thread: Thread, error: Throwable) {
         val trace = StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()

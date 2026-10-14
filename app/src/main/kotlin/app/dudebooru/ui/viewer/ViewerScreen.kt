@@ -189,8 +189,9 @@ fun ViewerScreen(
                 .offset { IntOffset(0, dragY.coerceAtLeast(0f).roundToInt()) }
                 .graphicsLayer { alpha = 1f - (abs(dragY) / (closeThreshold * 3)).coerceIn(0f, 0.5f) },
         ) {
-            HorizontalPager(state = pager, key = { slots[it].post.key }, beyondViewportPageCount = 1, modifier = Modifier.fillMaxSize()) { page ->
-                val post = slots[page].post
+            // Лента может сжаться (фильтр, скрытый пост), пока пейджер ещё считает старое число страниц.
+            HorizontalPager(state = pager, key = { slots.getOrNull(it)?.post?.key ?: it }, beyondViewportPageCount = 1, modifier = Modifier.fillMaxSize()) { page ->
+                val post = slots.getOrNull(page)?.post ?: return@HorizontalPager
                 val censor = LocalCensor.current
                 Box(Modifier.fillMaxSize().sharedPost(post.key, enabled = page == pager.currentPage)) {
                 when {
